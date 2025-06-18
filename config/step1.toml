@@ -1,0 +1,17 @@
+# Configuration Options for Step 1 (xTB)
+#TODO: go over toml docs
+title = "Step 1 Config"
+
+
+[xtb]
+num_conf = "auto"
+num_repeat = 1
+initiator_opt = "EtOAc"
+solvent = "Toluene"
+temp = 298.15
+energy_option = 1
+gfn_method = "gfn2"
+threads = 16
+ohess_level = "vtight"
+mmffv = "MMFF94"
+

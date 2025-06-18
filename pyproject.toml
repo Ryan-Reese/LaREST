@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools >= 42", "versioningit ~= 1.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "larest"
+description = "Lactone Ring-opening Energetics Sorting Tool"
+readme = "README.md"
+keywords = ["polymerisation", "xtb"]
+license = { text = "MIT" }
+authors = [
+{ name = "Ryan Reese" },
+{ name = "Alex Ganose" },
+{ name = "Charles Romain" },
+]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Other/Nonlisted Topic",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.11"

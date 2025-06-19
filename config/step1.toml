@@ -1,12 +1,19 @@
 # Configuration Options for Step 1 (xTB)
-#TODO: go over toml docs
 title = "Step 1 Config"
 
+[rdkit]
+random_seed = 42
+conformer_box_size = 2.0
+threads = 16
+precision = 6
+mmff = "MMFF94"
+mmff_iters = 200
+align_iters = 50
 
 [xtb]
-num_conf = "auto"
+num_conf = 5
 num_repeat = 1
-initiator_opt = "EtOAc"
+initiator = "EtOAc"
 solvent = "Toluene"
 temp = 298.15
 energy_option = 1

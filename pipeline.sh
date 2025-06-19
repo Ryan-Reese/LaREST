@@ -1,6 +1,6 @@
 !#/usr/bin/bash
 
-# WARN: this script should be run from larest directory
+# WARN: this script should be run from larest
 
 # TODO: confirm these job sizes
 
@@ -20,15 +20,15 @@ conda activate ${CONDA_ENV}
 
 # create output directories
 RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}/larest_$(date '+%Y%m%d%H%M%S')"
-mkdir -p "${RUN_DIR}/config/"
+mkdir -p "${RUN_DIR}/${CONFIG_DIR}/"
 cp "${PBS_O_WORKDIR}/${CONFIG_DIR}/*" "${RUN_DIR}/${CONFIG_DIR}"
 for i in {1..3}
 do
     mkdir -p "${RUN_DIR}/step${i}/"
 done
 
-# run step 1 of pipeline
-python "${PBS_O_WORKDIR}/${SRC_DIR}/step1.py"
+# run step 1 of pipeline (xTB)
+python "${PBS_O_WORKDIR}/${SRC_DIR}/step1.py" -o "${RUN_DIR}" -c "${RUN_DIR}/${CONFIG_DIR}/"
 
-# running crest
-crest --input "${CONFIG_DIR}/crest.toml"
+# run step 2 of pipeline (CREST)
+python "${PBS_O_WORKDIR}/${SRC_DIR}/step2.py" -o "${RUN_DIR}" -c "${RUN_DIR}/${CONFIG_DIR}/"

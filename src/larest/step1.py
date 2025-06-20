@@ -124,6 +124,8 @@ def run_initiator(smiles, n_conformers, args, config, logger):
 
         output_file = os.path.join(post_dir, f"conformer_{cid}.txt")
 
+        return 0
+
         # Optimisation with xTB
         # WARN: WHY WHY WHY???
         # TODO: use built-in xtb interface
@@ -603,4 +605,4 @@ if __name__ == "__main__":
         logger.exception(e)
         raise e
 
-    main(args, config, logger)
+    run_initiator("CC(=O)OC", 20, args, config, logger)

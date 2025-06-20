@@ -24,7 +24,7 @@ RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}/larest_${DATETIME}"
 mkdir -p "${RUN_DIR}/${CONFIG_DIR}"
 
 # copy config to run directory
-cp "${PBS_O_WORKDIR}/${CONFIG_DIR}/*" "${RUN_DIR}/${CONFIG_DIR}"
+cp -r "${PBS_O_WORKDIR}/${CONFIG_DIR}" "${RUN_DIR}"
 
 # run step 1 of pipeline (xTB)
 python "${PBS_O_WORKDIR}/${SRC_DIR}/step1.py" -o "${RUN_DIR}" -c "${RUN_DIR}/${CONFIG_DIR}"

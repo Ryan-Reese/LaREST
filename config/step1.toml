@@ -1,6 +1,10 @@
 # Configuration Options for Step 1 (xTB)
 title = "Step 1 Config"
 
+[initiator]
+smiles = "C1=CC=C(C=C1)C(=O)O"
+n_conformers = 20
+
 [rdkit]
 random_seed = 42
 conformer_box_size = 2.0
@@ -10,15 +14,16 @@ mmff = "MMFF94"
 mmff_iters = 200
 align_iters = 50
 
-[xtb]
-num_conf = 5
 num_repeat = 1
-initiator = "EtOAc"
-solvent = "Toluene"
-temp = 298.15
 energy_option = 1
-gfn_method = "gfn2"
-threads = 16
-ohess_level = "vtight"
-mmffv = "MMFF94"
+
+[xtb]
+
+ohess = "vtight"
+alpb = "Toluene"
+gfn = 2
+parallel = 16
+acc = 1.0
+iterations = 250
+etemp = 298.15
 

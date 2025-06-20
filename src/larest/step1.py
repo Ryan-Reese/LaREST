@@ -1,9 +1,12 @@
+import asyncio
 import argparse
 import os
 import logging
 import logging.config
 import tomllib
 import subprocess
+import pandas as pd
+from pathlib import Path
 from larest.config.parsers import XTBParser
 from larest.helpers import create_dir, get_ring_size
 from rdkit.Chem.rdchem import Mol
@@ -15,12 +18,9 @@ from rdkit.Chem.rdmolfiles import (
 )
 from rdkit.Chem.rdmolops import AddHs
 from rdkit.Chem.rdDistGeom import EmbedMultipleConfs
-from rdkit.Chem.rdForceFieldHelpers import (
-    MMFFGetMoleculeProperties,
-    MMFFOptimizeMoleculeConfs,
-    MMFFGetMoleculeForceField,
-)
+from rdkit.Chem.rdForceFieldHelpers import MMFFOptimizeMoleculeConfs
 from rdkit.Chem.rdMolAlign import AlignMolConformers
+from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, MMFFGetMoleculeForceField
 from typing import Any
 
 
@@ -41,17 +41,17 @@ def generate_conformer_energies(smiles, n_conformers, args, config, logger):
         numThreads=config["rdkit"]["threads"],
     )
 
-    logger.debug(f"Computing molecular properties for MMFF")
-    mp = MMFFGetMoleculeProperties(
-        mol, mmffVariant=config["rdkit"]["mmff"], mmffVerbosity=int(args.verbose)
-    )
-
     logger.debug(f"Optimising {n_conformers} conformers for Mol object")
     MMFFOptimizeMoleculeConfs(
         mol,
         numThreads=config["rdkit"]["threads"],
         maxIters=config["rdkit"]["mmff_iters"],
         mmffVariant=config["rdkit"]["mmff"],
+    )
+
+    logger.debug(f"Computing molecular properties for MMFF")
+    mp = MMFFGetMoleculeProperties(
+        mol, mmffVariant=config["rdkit"]["mmff"], mmffVerbosity=int(args.verbose)
     )
 
     logger.debug(f"Computing energies for {n_conformers} conformers")
@@ -85,7 +85,7 @@ def run_initiator(smiles, n_conformers, args, config, logger):
     create_dir(post_dir, logger)
 
     # Generate and write conformers in .sdf files
-    logger.info(f"Generating conformer energies using RDKit")
+    logger.info(f"Generating conformers and their energies using RDKit")
     mol, conformer_energies = generate_conformer_energies(
         smiles=smiles,
         n_conformers=n_conformers,
@@ -93,27 +93,29 @@ def run_initiator(smiles, n_conformers, args, config, logger):
         config=config,
         logger=logger,
     )
-    logger.info(f"Finished generating conformer energies using RDKit")
+    logger.info(f"Finished generating conformers")
 
     # Write conformers to .sdf file
-    output_file = os.path.join(pre_dir, "initiator.sdf")
-    logger.info(f"Writing conformer energies to {output_file}")
+    sdf_file = os.path.join(pre_dir, "initiator.sdf")
+    logger.info(f"Writing conformer energies to {sdf_file}")
 
-    with open(output_file, "w") as fstream:
+    with open(sdf_file, "w") as fstream:
         writer = SDWriter(fstream)
         for cid, energy in conformer_energies:
             mol.SetIntProp("conformer_id", cid)
             mol.SetDoubleProp("energy", energy)
             writer.write(mol, confId=cid)
         writer.close()
-    logger.info(f"Finished writing conformer energies to {output_file}")
+    logger.info(f"Finished writing conformer energies to {sdf_file}")
 
     # Write conformers to .xyz files
+    sdfstream = open(sdf_file, "rb")
     mol_supplier = ForwardSDMolSupplier(
-        fileobj=output_file, sanitize=False, removeHs=False
+        fileobj=sdfstream, sanitize=False, removeHs=False
     )
-    for cid, mol in mol_supplier:
+    for conformer in mol_supplier:
 
+        cid = conformer.GetIntProp("conformer_id")
         xyz_file = os.path.join(pre_dir, f"conformer_{cid}.xyz")
 
         MolToXYZFile(
@@ -122,147 +124,54 @@ def run_initiator(smiles, n_conformers, args, config, logger):
             precision=config["rdkit"]["precision"],
         )
 
-        output_file = os.path.join(post_dir, f"conformer_{cid}.txt")
+        conformer_dir = os.path.join(post_dir, f"conformer_{cid}")
+        create_dir(conformer_dir, logger)
 
-        return 0
+        xtb_output_file = os.path.join(conformer_dir, f"conformer_{cid}.txt")
 
         # Optimisation with xTB
-        # WARN: WHY WHY WHY???
-        # TODO: use built-in xtb interface
-        subprocess.run(["xtb", xyz_file, f"--{config['xtb']['gfn_method']}"])
-        os.system(
-            f"{find_xtb_path()} initial_initiator-{ind_poly}_conf-{ind_conf}.xyz --{gfn_method} --parallel {threads} --ohess {ohess_level} -g {solvent} > output_main-{ind_poly}_conf-{ind_conf}.txt"
-        )
-        logger.info("Obtaining thermo chemical properties...")
-        os.system(
-            f"{find_xtb_path()} thermo xtbopt.xyz --temp {temp},298.15 hessian > thermo-out-{ind_poly}_conf-{ind_conf}.txt"
-        )
-        os.chdir("../../../")
+        xtb_args = []
+        for k, v in zip(config["xtb"].keys(), config["xtb"].values()):
+            xtb_args.append(f"--{k}")
+            xtb_args.append(str(v))
+        xtb_args = [
+            "xtb",
+            f"../../pre/conformer_{cid}.xyz",
+            "--verbose",
+            "--namespace",
+            f"conformer_{cid}",
+            "--json",
+        ] + xtb_args
 
-        # Extract output results from each conformer (ETot, H, S, G)
-        os.mkdir(
-            f"initiator_{ind_poly}/Conformer_{ind_conf}/opt_{ind_conf}/energy_extract_{ind_conf}"
-        )
-        file_location = os.path.join(
-            f"initiator_{ind_poly}",
-            f"Conformer_{ind_conf}",
-            f"opt_{ind_conf}",
-            f"output_main-{ind_poly}_conf-{ind_conf}.txt",
-        )
-        filenames = glob.glob(file_location)
+        with open(xtb_output_file, "w") as fstream:
+            subprocess.Popen(
+                args=xtb_args,
+                stdout=fstream,
+                stderr=subprocess.STDOUT,
+                cwd=conformer_dir,
+            ).wait()
 
-        datafile0 = open(
-            f"initiator_{ind_poly}/Conformer_{ind_conf}/opt_{ind_conf}/energy_extract_{ind_conf}/extract_opt-{ind_poly}_conf-{ind_conf}.txt",
-            "w+",
-        )
+    results = dict(conformer_id=[], enthalpy=[], entropy=[], free_energy=[])
 
-        for f in filenames:
-            outfile = open(f, "r")
-            data = outfile.readlines()
-            outfile.close()
+    with os.scandir(post_dir) as folder:
+        conformer_dirs = [d for d in folder if d.is_dir()]
 
-            temperature = None
-            enthalpy = None
-            free_energy = None
-            index = -1
+    for conformer_dir in conformer_dirs:
+        xtb_output_file = os.path.join(conformer_dir, f"{conformer_dir.name}.txt")
+        results["conformer_id"].append(conformer_dir.name.split("_")[1])
 
-            for line in data:
-                index += 1
-                if "Temperature" in line:
-                    temperature = float(line.split()[1])
-                if "TOTAL ENTHALPY" in line:
-                    enthalpy = float(line.split()[3]) * 2625.5 * 1000
-                if "TOTAL FREE ENERGY" in line:
-                    free_energy = float(line.split()[4]) * 2625.5 * 1000
-                if temperature and enthalpy and free_energy:
-                    break
+        with open(xtb_output_file, "r") as fstream:
+            for line in fstream:
+                if "H(0)-H(T)+PV" in line:
+                    fstream.readline()
+                    thermo = fstream.readline().split()
+                    results["enthalpy"].append(float(thermo[2]) * 2625499.63948)
+                    results["entropy"].append(float(thermo[3]) * 2625499.63948 / 298.15)
+                    results["free_energy"].append(float(thermo[4]) * 2625499.63948)
 
-            if temperature and enthalpy and free_energy:
-                entropy = (enthalpy - free_energy) / temperature
-                datafile0.write(
-                    f"Temperature {ind_poly} conf {ind_conf} = {temperature} K\n"
-                )
-                datafile0.write(
-                    f"Enthalpy {ind_poly} conf {ind_conf} = {enthalpy} J/mol\n"
-                )
-                datafile0.write(
-                    f"Entropy {ind_poly} conf {ind_conf} = {entropy} J/K/mol\n"
-                )
-                datafile0.write(
-                    f"Free energy {ind_poly} conf {ind_conf} = {free_energy} J/mol\n"
-                )
-            else:
-                logger.error(
-                    f"Failed to extract thermo data for initiator {ind_poly} conf {ind_conf}"
-                )
-            datafile0.close()
-        logger.info(
-            f"H, S, G, extracted/calculated for conformer {ind_conf} (initiator {ind_poly})"
-        )
-
-    # Get list of energies for each polymer (ETot, H, S, G)
-    file_location = os.path.join(
-        f"initiator_{ind_poly}",
-        "Conformer_*",
-        "opt_*",
-        "energy_extract_*",
-        "extract_opt-*",
-    )
-    # Data will be sorted in the correct order
-    filenames = sorted(glob.glob(file_location), key=os.path.getmtime)
-
-    logger.info(
-        f"Saving enthalpy values (J/mol) of all conformers (initiator {ind_poly})"
-    )
-    datafile1 = open(f"initiator_{ind_poly}/H_all_{ind_poly}.txt", "w+")
-    for f in filenames:
-        outfile = open(f, "r")
-        data = outfile.readlines()
-        outfile.close()
-        for line in data:
-            if "Enthalpy" in line:
-                H_line = line
-                words = H_line.split()
-                conf = str(words[3])
-                H = float(words[5])
-                datafile1.write(f"Enthalpy conformer {conf} = {H} J/mol\n")
-    datafile1.close()
-
-    logger.info(
-        f"Saving entropy values (J/mol/K) of all conformers (initiator {ind_poly})"
-    )
-    datafile2 = open(f"initiator_{ind_poly}/S_all_{ind_poly}.txt", "w+")
-    for f in filenames:
-        outfile = open(f, "r")
-        data = outfile.readlines()
-        outfile.close()
-        for line in data:
-            if "Entropy" in line:
-                S_line = line
-                words = S_line.split()
-                conf = str(words[3])
-                S = float(words[5])
-                datafile2.write(f"Entropy conformer {conf} = {S} J/K/mol\n")
-    datafile2.close()
-
-    logger.info(
-        f"Saving free energy values (J/mol) of all conformers (initiator {ind_poly})"
-    )
-    datafile3 = open(f"initiator_{ind_poly}/G_all_{ind_poly}.txt", "w+")
-    for f in filenames:
-        outfile = open(f, "r")
-        data = outfile.readlines()
-        outfile.close()
-        for line in data:
-            if "Free energy" in line:
-                G_line = line
-                words = G_line.split()
-                conf = str(words[4])
-                G = float(words[6])
-                datafile3.write(f"Free energy conformer {conf} = {G} J/mol\n")
-    datafile3.close()
-
-    shutil.move(r"starting_initiator", r"initiator_0")
+    results_file = os.path.join(post_dir, "results.csv")
+    results = pd.DataFrame(results)
+    results.to_csv(results_file, header=True, index=False)
 
     logger.info("========================================================")
     logger.info("===== initiator optimisation/data extraction finished ====")
@@ -605,4 +514,10 @@ if __name__ == "__main__":
         logger.exception(e)
         raise e
 
-    run_initiator("CC(=O)OC", 20, args, config, logger)
+    run_initiator(
+        config["initiator"]["smiles"],
+        config["initiator"]["n_conformers"],
+        args,
+        config,
+        logger,
+    )

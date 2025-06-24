@@ -16,16 +16,19 @@ from larest.helpers import (
     parse_monomer_smiles,
     parse_xtb,
 )
-from larest.constants import HARTTREE_TO_JMOL
-from rdkit.Chem.rdchem import Mol
+from larest.constants import HARTTREE_TO_JMOL, FUNCTIONAL_GROUPS, INITIATOR_GROUPS
+from rdkit.Chem.rdchem import Atom, Mol, EditableMol, BondType
 from rdkit.Chem.rdmolfiles import (
+    MolFromSmarts,
     MolFromSmiles,
+    MolToSmiles,
     SDWriter,
     ForwardSDMolSupplier,
     MolToXYZFile,
 )
-from rdkit.Chem.rdmolops import AddHs
+from rdkit.Chem.rdmolops import AddHs, CombineMols, molzip, MolzipParams, MolzipLabel
 from rdkit.Chem.rdDistGeom import EmbedMultipleConfs
+from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
 from rdkit.Chem.rdForceFieldHelpers import MMFFOptimizeMoleculeConfs
 from rdkit.Chem.rdMolAlign import AlignMolConformers
 from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, MMFFGetMoleculeForceField
@@ -203,48 +206,125 @@ def run_xtb_conformers(
     logger.info(f"Finished writing {mol_type} results")
 
 
-def run_xtb(smiles, n_conformers, args, config, logger):
+def get_polymer_unit(
+    smiles: str,
+    mol_type: Literal["monomer", "initiator"],
+    front_dummy: str,
+    back_dummy: str,
+    logger: logging.Logger,
+):
+    # NOTE: takes the first found match (does not support molecules with >1 possible functional group for ring-opening polymerisation
+
+    if mol_type == "monomer":
+        fgs = [MolFromSmarts(fg) for fg in FUNCTIONAL_GROUPS]
+    else:
+        fgs = [MolFromSmarts(fg) for fg in INITIATOR_GROUPS]
+
+    # convert SMILES to mol
+    mol = MolFromSmiles(smiles)
+    front_dummy = MolFromSmiles(f"[{front_dummy}]").GetAtomWithIdx(0)
+    back_dummy = MolFromSmiles(f"[{back_dummy}]").GetAtomWithIdx(0)
+
+    fg_atom_idx = []
+    for fg in fgs:
+        if mol.HasSubstructMatch(fg):
+            substruct = mol.GetSubstructMatches(fg)[0]
+            for atom_id in substruct:
+                if mol_type == "monomer":
+                    if mol.GetAtomWithIdx(atom_id).IsInRing():
+                        fg_atom_idx.append(atom_id)
+                else:
+                    fg_atom_idx.append(atom_id)
+            break
+
+    if len(fg_atom_idx) == 0:
+        pass  # TODO: error
+
+    emol = EditableMol(mol)
+    emol.RemoveBond(*fg_atom_idx)
+
+    emol.AddBond(
+        beginAtomIdx=fg_atom_idx[0],
+        endAtomIdx=emol.AddAtom(front_dummy),
+        order=BondType.SINGLE,
+    )
+    emol.AddBond(
+        beginAtomIdx=fg_atom_idx[1],
+        endAtomIdx=emol.AddAtom(back_dummy),
+        order=BondType.SINGLE,
+    )
+
+    return emol.GetMol()
+
+
+def build_ROR_polymer(monomer_smiles, length, config, logger):
+
+    mol_zip_params = MolzipParams()
+    mol_zip_params.label = MolzipLabel.AtomType
+    polymer = get_polymer_unit(
+        smiles=monomer_smiles,
+        mol_type="monomer",
+        front_dummy="Xe",
+        back_dummy="Y",
+        logger=logger,
+    )
+
+    print(MolToSmiles(polymer))
+
+    front_dummy, back_dummy = "Y", "Zr"
+    for _ in range(length - 1):
+        repeating_unit = get_polymer_unit(
+            smiles=monomer_smiles,
+            mol_type="monomer",
+            front_dummy=front_dummy,
+            back_dummy=back_dummy,
+            logger=logger,
+        )
+        mol_zip_params.setAtomSymbols([front_dummy])
+        polymer = molzip(polymer, repeating_unit, mol_zip_params)
+        front_dummy, back_dummy = back_dummy, front_dummy
+        print(MolToSmiles(polymer))
+
+    initiator = get_polymer_unit(
+        smiles=config["initiator"]["smiles"],
+        mol_type="initiator",
+        front_dummy=front_dummy,
+        back_dummy="Xe",
+        logger=logger,
+    )
+    mol_zip_params.setAtomSymbols([front_dummy, "Xe"])
+    polymer = molzip(polymer, initiator, mol_zip_params)
+    print(MolToSmiles(polymer))
+
+
+def run_xtb(monomer_smiles, n_conformers, args, config, logger):
     """
     Calculates the thermodynamic parameters of the Ring-Opening Reaction (ROR) of a given monomer SMILES
     """
     try:
-        if config["initiator"] == "EtOAc":
-            init = "MethylAcetate"  # NOTE: ethyl acetate?
-            mol = "CC(=O)OC"
-            initial_bb = "CC(=O)Br"
-            final_bb = "COBr"
-        elif initiator_opt == "MeOH":
-            init = "Methanol"
-            mol = "CO"
-            initial_bb = "Br"
-            final_bb = "COBr"
-        elif initiator_opt == "H2O":
-            init = "Water"
-            mol = "O"
-            initial_bb = "Br"
-            final_bb = "OBr"
 
-        run_initiator(
+        run_xtb_conformers(
             smiles=config["initiator"]["smiles"],
             n_conformers=config["initiator"]["n_conformers"],
+            mol_type="initiator",
             args=args,
             config=config,
             logger=logger,
         )
 
+        run_xtb_conformers(
+            smiles=monomer_smiles,
+            n_conformers=config["initiator"]["n_conformers"],
+            mol_type="initiator",
+            args=args,
+            config=config,
+            logger=logger,
+        )
+
+        monomer_smiles = StandardizeSmiles(monomer_smiles)
+
         run_name = f"{count}_{lactone_smiles}_{num_conf}conformers_{num_repeat}repeatunits_{init}initiator_{solvent}solvent_{temp}K"
 
-        lactone_ring(
-            lactone_smiles,
-            0,
-            num_conf,
-            solvent,
-            temp,
-            gfn_method,
-            threads,
-            ohess_level,
-            mmffv,
-        )
         repeating_bb = lactone_to_repeating_unit(lactone_smiles)
         num_repeat_units = repeating(num_repeat, "B")
         orientation_str = f"0, {repeating(num_repeat, ' 1, ')} {float(0.5)}"
@@ -520,19 +600,20 @@ if __name__ == "__main__":
         logger.exception(e)
         raise SystemExit(1)
 
-    run_xtb_conformers(
-        config["initiator"]["smiles"],
-        config["initiator"]["n_conformers"],
-        "initiator",
-        args,
-        config,
-        logger,
-    )
-    run_xtb_conformers(
-        "C1CCOC(=O)C1",
-        20,
-        "monomer",
-        args,
-        config,
-        logger,
-    )
+    # run_xtb_conformers(
+    #     config["initiator"]["smiles"],
+    #     config["initiator"]["n_conformers"],
+    #     "initiator",
+    #     args,
+    #     config,
+    #     logger,
+    # )
+    # run_xtb_conformers(
+    #     "C1CCOC(=O)C1",
+    #     20,
+    #     "monomer",
+    #     args,
+    #     config,
+    #     logger,
+    # )
+    build_ROR_polymer("CC1CCC(=O)O1", 10, config, logger)

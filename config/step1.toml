@@ -1,8 +1,18 @@
 # Configuration Options for Step 1 (xTB)
 title = "Step 1 Config"
 
+[reaction]
+type = "ROR"
+lengths = [2, 3, 4, 5, 6]
+
+[monomer]
+n_conformers = 20
+
 [initiator]
 smiles = "C1=CC=C(C=C1)C(=O)O"
+n_conformers = 20
+
+[polymer]
 n_conformers = 20
 
 [rdkit]
@@ -18,7 +28,6 @@ num_repeat = 1
 energy_option = 1
 
 [xtb]
-
 ohess = "vtight"
 alpb = "Toluene"
 gfn = 2

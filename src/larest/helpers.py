@@ -42,6 +42,14 @@ def create_dir(dir_path: str | Path, logger: logging.Logger) -> None:
         logger.warning(f"Directory {dir_path} already exists")
 
 
+def create_pre_post_dirs(dir_path: str | Path, logger: logging.Logger) -> None:
+    create_dir(dir_path, logger)
+    pre_dir = os.path.join(dir_path, "pre")
+    create_dir(pre_dir, logger)
+    post_dir = os.path.join(dir_path, "post")
+    create_dir(post_dir, logger)
+
+
 def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
     xtb_args = []
     try:
@@ -59,7 +67,7 @@ def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
 
 def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> list[str]:
     input_file = os.path.join(args.config, "input.txt")
-    logger.info(f"Reading monomer smiles from {input_file}")
+    logger.debug(f"Reading monomer smiles from {input_file}")
 
     try:
         with open(input_file, "r") as fstream:
@@ -71,6 +79,7 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
         return monomer_smiles
     except Exception as e:
         logger.exception(e)
+        logger.error("Failed to read input monomer smiles")
         raise SystemExit(1)
 
 
@@ -171,7 +180,11 @@ def build_polymer(
     reaction_type: Literal["ROR", "RER"],
     config: dict[str, Any],
     logger: logging.Logger,
-):
+) -> Mol | None:
+    if length <= 1:
+        logger.error(f"Please specify a polymer length > 1 (current length: {length}")
+        return None
+
     mol_zip_params = MolzipParams()
     mol_zip_params.label = MolzipLabel.AtomType
 
@@ -192,7 +205,7 @@ def build_polymer(
     )
     if polymer is None:
         logger.error(f"Failed to create monomer unit from {monomer_smiles}")
-        SystemExit(1)
+        return None
 
     monomer_units = 1
     front_dummy, back_dummy = "Y", "Zr"
@@ -237,9 +250,9 @@ def build_polymer(
         logger.error(
             f"Failed to create terminal group from {terminal_config[reaction_type]['smiles']}"
         )
-        SystemExit(1)
+        return None
 
     mol_zip_params.setAtomSymbols([front_dummy, "Xe"])
     polymer = molzip(polymer, terminal_unit, mol_zip_params)
     logger.info(f"Finished building {reaction_type} polymer: {MolToSmiles(polymer)}")
-    return polymer
+    return MolToSmiles(polymer)

@@ -1,40 +1,46 @@
-import os
 import argparse
 import logging
 import logging.config
-import tomllib
+import os
 import subprocess
-from typing import Any, Literal
-import pandas as pd
-from tqdm import tqdm
+import tomllib
 from pathlib import Path
+from typing import Any, Literal
+
+import pandas as pd
+from rdkit.Chem.AllChem import MMFFGetMoleculeForceField, MMFFGetMoleculeProperties
+from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
+from rdkit.Chem.rdchem import Atom, Mol
+from rdkit.Chem.rdDistGeom import EmbedMultipleConfs
+from rdkit.Chem.rdForceFieldHelpers import MMFFOptimizeMoleculeConfs
+from rdkit.Chem.rdMolAlign import AlignMolConformers
+from rdkit.Chem.rdmolfiles import (
+    ForwardSDMolSupplier,
+    MolFromSmiles,
+    MolToXYZFile,
+    SDWriter,
+)
+from rdkit.Chem.rdmolops import AddHs
+
 from larest.config.parsers import XTBParser
 from larest.helpers import (
+    build_polymer,
     create_dir,
+    create_pre_post_dirs,
     get_ring_size,
     get_xtb_args,
     parse_monomer_smiles,
     parse_xtb,
 )
-from larest.constants import HARTTREE_TO_JMOL, FUNCTIONAL_GROUPS, INITIATOR_GROUPS
-from rdkit.Chem.rdchem import Atom, Mol, EditableMol, BondType
-from rdkit.Chem.rdmolfiles import (
-    MolFromSmarts,
-    MolFromSmiles,
-    MolToSmiles,
-    SDWriter,
-    ForwardSDMolSupplier,
-    MolToXYZFile,
-)
-from rdkit.Chem.rdmolops import AddHs, CombineMols, molzip, MolzipParams, MolzipLabel
-from rdkit.Chem.rdDistGeom import EmbedMultipleConfs
-from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
-from rdkit.Chem.rdForceFieldHelpers import MMFFOptimizeMoleculeConfs
-from rdkit.Chem.rdMolAlign import AlignMolConformers
-from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, MMFFGetMoleculeForceField
 
 
-def generate_conformer_energies(smiles, n_conformers, args, config, logger):
+def generate_conformer_energies(
+    smiles: str,
+    n_conformers: int,
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    logger: logging.Logger,
+):
     """
     Generates conformers from a given SMILES string using RDKit
     """
@@ -59,7 +65,7 @@ def generate_conformer_energies(smiles, n_conformers, args, config, logger):
         mmffVariant=config["rdkit"]["mmff"],
     )
 
-    logger.debug(f"Computing molecular properties for MMFF")
+    logger.debug("Computing molecular properties for MMFF")
     mp = MMFFGetMoleculeProperties(
         mol, mmffVariant=config["rdkit"]["mmff"], mmffVerbosity=int(args.verbose)
     )
@@ -81,8 +87,8 @@ def generate_conformer_energies(smiles, n_conformers, args, config, logger):
 
 def run_xtb_conformers(
     smiles: str,
-    n_conformers: int,
-    mol_type: Literal["monomer", "initiator"],
+    mol_type: Literal["monomer", "initiator", "polymer"],
+    dir_name: str,
     args: argparse.Namespace,
     config: dict[str, Any],
     logger: logging.Logger,
@@ -91,10 +97,10 @@ def run_xtb_conformers(
     Calculates the thermodynamic parameters of the molecule with the specified SMILES string
     """
 
-    logger.info(f"Computing thermodynamic parameters of {mol_type} (smiles: {smiles})")
+    logger.info(f"Computing thermodynamic parameters of {mol_type} ({smiles})")
 
-    # Create output dirs for initiator
-    mol_dir = os.path.join(args.output, "step1", f"{mol_type}")
+    # Create output dirs
+    mol_dir = os.path.join(args.output, "step1", f"{mol_type}_{dir_name}")
     create_dir(mol_dir, logger)
     pre_dir = os.path.join(mol_dir, "pre")
     create_dir(pre_dir, logger)
@@ -102,15 +108,17 @@ def run_xtb_conformers(
     create_dir(post_dir, logger)
 
     # Generate and write conformers in .sdf files
-    logger.info(f"Generating conformers and their energies using RDKit")
+    logger.info("Generating conformers and their energies using RDKit")
+    # Use canonical SMILES
+    smiles = StandardizeSmiles(smiles)
     mol, conformer_energies = generate_conformer_energies(
         smiles=smiles,
-        n_conformers=n_conformers,
+        n_conformers=config[mol_type]["n_conformers"],
         args=args,
         config=config,
         logger=logger,
     )
-    logger.info(f"Finished generating conformers")
+    logger.info("Finished generating conformers")
 
     # Write conformers to .sdf file
     sdf_file = os.path.join(pre_dir, "conformers.sdf")
@@ -123,7 +131,7 @@ def run_xtb_conformers(
             mol.SetDoubleProp("energy", energy)
             writer.write(mol, confId=cid)
         writer.close()
-    logger.debug(f"Finished writing conformers and their energies")
+    logger.debug("Finished writing conformers and their energies")
 
     # Write conformers to .xyz files
     logger.debug(f"Getting conformer coordinates from {sdf_file}")
@@ -134,7 +142,6 @@ def run_xtb_conformers(
 
     # Iterating over conformers
     for conformer in mol_supplier:
-
         # Conformer id and location of xyz file
         cid = conformer.GetIntProp("conformer_id")
         xyz_file = os.path.join(pre_dir, f"conformer_{cid}.xyz")
@@ -182,7 +189,6 @@ def run_xtb_conformers(
     logger.debug(f"Searching conformer dirs {conformer_dirs}")
 
     for conformer_dir in conformer_dirs:
-
         xtb_output_file = os.path.join(conformer_dir, f"{conformer_dir.name}.txt")
         logger.debug(f"Searching for results in file {xtb_output_file}")
 
@@ -206,106 +212,13 @@ def run_xtb_conformers(
     logger.info(f"Finished writing {mol_type} results")
 
 
-def get_polymer_unit(
-    smiles: str,
-    mol_type: Literal["monomer", "initiator"],
-    front_dummy: str,
-    back_dummy: str,
-    logger: logging.Logger,
-):
-    # NOTE: takes the first found match (does not support molecules with >1 possible functional group for ring-opening polymerisation
-
-    if mol_type == "monomer":
-        fgs = [MolFromSmarts(fg) for fg in FUNCTIONAL_GROUPS]
-    else:
-        fgs = [MolFromSmarts(fg) for fg in INITIATOR_GROUPS]
-
-    # convert SMILES to mol
-    mol = MolFromSmiles(smiles)
-    front_dummy = MolFromSmiles(f"[{front_dummy}]").GetAtomWithIdx(0)
-    back_dummy = MolFromSmiles(f"[{back_dummy}]").GetAtomWithIdx(0)
-
-    fg_atom_idx = []
-    for fg in fgs:
-        if mol.HasSubstructMatch(fg):
-            substruct = mol.GetSubstructMatches(fg)[0]
-            for atom_id in substruct:
-                if mol_type == "monomer":
-                    if mol.GetAtomWithIdx(atom_id).IsInRing():
-                        fg_atom_idx.append(atom_id)
-                else:
-                    fg_atom_idx.append(atom_id)
-            break
-
-    if len(fg_atom_idx) == 0:
-        pass  # TODO: error
-
-    emol = EditableMol(mol)
-    emol.RemoveBond(*fg_atom_idx)
-
-    emol.AddBond(
-        beginAtomIdx=fg_atom_idx[0],
-        endAtomIdx=emol.AddAtom(front_dummy),
-        order=BondType.SINGLE,
-    )
-    emol.AddBond(
-        beginAtomIdx=fg_atom_idx[1],
-        endAtomIdx=emol.AddAtom(back_dummy),
-        order=BondType.SINGLE,
-    )
-
-    return emol.GetMol()
-
-
-def build_ROR_polymer(monomer_smiles, length, config, logger):
-
-    mol_zip_params = MolzipParams()
-    mol_zip_params.label = MolzipLabel.AtomType
-    polymer = get_polymer_unit(
-        smiles=monomer_smiles,
-        mol_type="monomer",
-        front_dummy="Xe",
-        back_dummy="Y",
-        logger=logger,
-    )
-
-    print(MolToSmiles(polymer))
-
-    front_dummy, back_dummy = "Y", "Zr"
-    for _ in range(length - 1):
-        repeating_unit = get_polymer_unit(
-            smiles=monomer_smiles,
-            mol_type="monomer",
-            front_dummy=front_dummy,
-            back_dummy=back_dummy,
-            logger=logger,
-        )
-        mol_zip_params.setAtomSymbols([front_dummy])
-        polymer = molzip(polymer, repeating_unit, mol_zip_params)
-        front_dummy, back_dummy = back_dummy, front_dummy
-        print(MolToSmiles(polymer))
-
-    initiator = get_polymer_unit(
-        smiles=config["initiator"]["smiles"],
-        mol_type="initiator",
-        front_dummy=front_dummy,
-        back_dummy="Xe",
-        logger=logger,
-    )
-    mol_zip_params.setAtomSymbols([front_dummy, "Xe"])
-    polymer = molzip(polymer, initiator, mol_zip_params)
-    print(MolToSmiles(polymer))
-
-
 def run_xtb(monomer_smiles, n_conformers, args, config, logger):
     """
     Calculates the thermodynamic parameters of the Ring-Opening Reaction (ROR) of a given monomer SMILES
     """
     try:
-
         run_xtb_conformers(
             smiles=config["initiator"]["smiles"],
-            n_conformers=config["initiator"]["n_conformers"],
             mol_type="initiator",
             args=args,
             config=config,
@@ -459,14 +372,61 @@ def run_xtb(monomer_smiles, n_conformers, args, config, logger):
 
 
 def main(args, config, logger):
-
     # get input monomer SMILES strings
+
     monomer_smiles = parse_monomer_smiles(args, logger)
-    logger.info("Finished reading monomer smiles")
+    logger.info("Finished reading input monomer smiles")
 
     # setup output dir
     output_dir = os.path.join(args.output, "step1")
     create_dir(output_dir, logger)
+
+    # run xtb for initiator in ROR reaction
+    if config["reaction"]["type"] == "ROR":
+        run_xtb_conformers(
+            smiles=config["initiator"]["smiles"],
+            mol_type="initiator",
+            dir_name=config["initiator"]["smiles"],
+            args=args,
+            config=config,
+            logger=logger,
+        )
+    # iterate over monomers in input list
+    for monomer_smiles in monomer_smiles:
+        # run xtb for monomer
+        run_xtb_conformers(
+            smiles=monomer_smiles,
+            mol_type="monomer",
+            dir_name=monomer_smiles,
+            args=args,
+            config=config,
+            logger=logger,
+        )
+
+        # iterate over polymer lengths
+        for length in config["reaction"]["lengths"]:
+            # build polymer
+            polymer_smiles = build_polymer(
+                monomer_smiles=monomer_smiles,
+                length=length,
+                reaction_type=config["reaction"]["type"],
+                config=config,
+                logger=logger,
+            )
+            if polymer_smiles is None:
+                logger.warning(
+                    f"Failed to build polymer of length {length}, moving onto next length"
+                )
+                continue
+            # run xtb for polymer
+            run_xtb_conformers(
+                smiles=polymer_smiles,
+                mol_type="polymer",
+                dir_name=f"{monomer_smiles}_{length}",
+                args=args,
+                config=config,
+                logger=logger,
+            )
 
     # run xTB calculations
     count = 1  # Start count from 1
@@ -497,7 +457,7 @@ def main(args, config, logger):
     }
 
     for i, smiles in enumerate(monomer_smiles):
-        logger.info(f"Processing SMILES ({i+1}/{len(monomer_smiles)}): {smiles}")
+        logger.info(f"Processing SMILES ({i + 1}/{len(monomer_smiles)}): {smiles}")
 
         ring_size = get_ring_size(smiles)
         logger.debug(f"Computed ring size: {ring_size}")
@@ -573,7 +533,6 @@ def main(args, config, logger):
 
 
 if __name__ == "__main__":
-
     # parse input arguments to get output and config dirs
     parser = XTBParser()
     args = parser.parse_args()
@@ -588,7 +547,7 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     logging.config.dictConfig(log_config)
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("Step 1")
     logger.info("Logging config loaded")
 
     # load step 1 config
@@ -598,22 +557,9 @@ if __name__ == "__main__":
             logger.info("Step 1 config loaded")
     except Exception as e:
         logger.exception(e)
+        logger.error("Failed to load Step 1 config")
         raise SystemExit(1)
 
-    # run_xtb_conformers(
-    #     config["initiator"]["smiles"],
-    #     config["initiator"]["n_conformers"],
-    #     "initiator",
-    #     args,
-    #     config,
-    #     logger,
-    # )
-    # run_xtb_conformers(
-    #     "C1CCOC(=O)C1",
-    #     20,
-    #     "monomer",
-    #     args,
-    #     config,
-    #     logger,
-    # )
-    build_ROR_polymer("CC1CCC(=O)O1", 10, config, logger)
+    # TODO: write assertions for config
+
+    main(args, config, logger)

@@ -42,14 +42,6 @@ def create_dir(dir_path: str | Path, logger: logging.Logger) -> None:
         logger.warning(f"Directory {dir_path} already exists")
 
 
-def create_pre_post_dirs(dir_path: str | Path, logger: logging.Logger) -> None:
-    create_dir(dir_path, logger)
-    pre_dir = os.path.join(dir_path, "pre")
-    create_dir(pre_dir, logger)
-    post_dir = os.path.join(dir_path, "post")
-    create_dir(post_dir, logger)
-
-
 def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
     xtb_args = []
     try:
@@ -60,7 +52,7 @@ def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
     except Exception as e:
         logger.exception(e)
         logger.warning(
-            f"Failed to parse xtb arguments from dictionary {config}, using default xtb arguments"
+            f"Failed to parse xtb arguments from dictionary {config['xtb']}, using default xtb arguments"
         )
     return xtb_args
 
@@ -84,28 +76,30 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
 
 
 def parse_xtb(
-    xtb_output_file: str | Path, logger: logging.Logger
-) -> tuple[float | None, float | None, float | None]:
-    enthalpy, entropy, free_energy = None, None, None
+    xtb_output_file: str | Path, config: dict[str, Any], logger: logging.Logger
+) -> tuple[float | None, float | None, float | None, float | None]:
+    enthalpy, entropy, free_energy, total_energy = None, None, None, None
 
     with open(xtb_output_file, "r") as fstream:
         for line in fstream:
-            if "H(0)-H(T)+PV" in line:
-                fstream.readline()
-                thermo = fstream.readline().split()
-                try:
-                    # FIX: need to extract correct numbers from xtb
-                    enthalpy = float(thermo[2]) * HARTTREE_TO_JMOL
-                    entropy = float(thermo[3]) * HARTTREE_TO_JMOL / 298.15
-                    free_energy = float(thermo[4]) * HARTTREE_TO_JMOL
-                except Exception as e:
-                    logger.exception(e)
+            try:
+                if "TOTAL ENERGY" in line:
+                    total_energy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                elif "TOTAL ENTHALPY" in line:
+                    enthalpy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                elif "TOTAL FREE ENERGY" in line:
+                    free_energy = float(line.split()[4]) * HARTTREE_TO_JMOL
+            except Exception as e:
+                logger.exception(e)
 
-    if not (enthalpy and entropy and free_energy):
+    if not (enthalpy and free_energy and total_energy):
         logger.warning(
-            f"Failed to extract data from from {xtb_output_file}, assigning None instead"
+            f"Failed to extract all data from {xtb_output_file}, missing data will be assigned None"
         )
-    return enthalpy, entropy, free_energy
+    else:
+        entropy = (enthalpy - free_energy) / config["xtb"]["etemp"]
+
+    return enthalpy, entropy, free_energy, total_energy
 
 
 def get_polymer_unit(

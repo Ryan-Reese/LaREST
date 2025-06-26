@@ -4,13 +4,13 @@ import logging.config
 import os
 import subprocess
 import tomllib
-from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import pandas as pd
 from rdkit.Chem.AllChem import MMFFGetMoleculeForceField, MMFFGetMoleculeProperties
 from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
-from rdkit.Chem.rdchem import Atom, Mol
+from rdkit.Chem.rdchem import Mol
 from rdkit.Chem.rdDistGeom import EmbedMultipleConfs
 from rdkit.Chem.rdForceFieldHelpers import MMFFOptimizeMoleculeConfs
 from rdkit.Chem.rdMolAlign import AlignMolConformers
@@ -21,12 +21,13 @@ from rdkit.Chem.rdmolfiles import (
     SDWriter,
 )
 from rdkit.Chem.rdmolops import AddHs
+from tqdm import tqdm
 
 from larest.config.parsers import XTBParser
+from larest.constants import KCALMOL_TO_JMOL
 from larest.helpers import (
     build_polymer,
     create_dir,
-    create_pre_post_dirs,
     get_ring_size,
     get_xtb_args,
     parse_monomer_smiles,
@@ -40,7 +41,7 @@ def generate_conformer_energies(
     args: argparse.Namespace,
     config: dict[str, Any],
     logger: logging.Logger,
-):
+) -> tuple[Mol, list[tuple[int, float]]]:
     """
     Generates conformers from a given SMILES string using RDKit
     """
@@ -73,10 +74,14 @@ def generate_conformer_energies(
     logger.debug(f"Computing energies for the {n_conformers} conformers")
     conformer_energies = sorted(
         [
-            (cid, MMFFGetMoleculeForceField(mol, mp, confId=cid).CalcEnergy())
+            (
+                cid,
+                MMFFGetMoleculeForceField(mol, mp, confId=cid).CalcEnergy()
+                * KCALMOL_TO_JMOL,
+            )
             for cid in conformer_ids
         ],
-        key=lambda x: x[1],
+        key=lambda x: x[1],  # sort by energies
     )
 
     logger.debug(f"Aligning {n_conformers} conformers by their geometries")
@@ -109,10 +114,8 @@ def run_xtb_conformers(
 
     # Generate and write conformers in .sdf files
     logger.info("Generating conformers and their energies using RDKit")
-    # Use canonical SMILES
-    smiles = StandardizeSmiles(smiles)
     mol, conformer_energies = generate_conformer_energies(
-        smiles=smiles,
+        smiles=StandardizeSmiles(smiles),  # USE CANONICAL SMILES
         n_conformers=config[mol_type]["n_conformers"],
         args=args,
         config=config,
@@ -141,7 +144,12 @@ def run_xtb_conformers(
     )
 
     # Iterating over conformers
-    for conformer in mol_supplier:
+    logger.info("Computing thermodynamic parameters of conformers using xTB")
+    for conformer in tqdm(
+        mol_supplier,
+        desc="iterating over conformers",
+        total=config[mol_type]["n_conformers"],
+    ):
         # Conformer id and location of xyz file
         cid = conformer.GetIntProp("conformer_id")
         xyz_file = os.path.join(pre_dir, f"conformer_{cid}.xyz")
@@ -170,7 +178,7 @@ def run_xtb_conformers(
             "--json",
         ] + get_xtb_args(config, logger)
 
-        logger.debug(f"Running xtb thermodynamic computations on conformer {cid}")
+        logger.debug(f"Running xTB on conformer {cid}")
         with open(xtb_output_file, "w") as fstream:
             subprocess.Popen(
                 args=xtb_args,
@@ -178,11 +186,14 @@ def run_xtb_conformers(
                 stderr=subprocess.STDOUT,
                 cwd=conformer_dir,
             ).wait()
-        logger.info(f"xTB results saved to {xtb_output_file}")
+        logger.debug(f"Finished running xTB on conformer {cid}")
     sdfstream.close()
+    logger.info("Finished running xTB on conformers")
 
     logger.info("Compiling results of xTB computations")
-    results = dict(conformer_id=[], enthalpy=[], entropy=[], free_energy=[])
+    results = dict(
+        conformer_id=[], enthalpy=[], entropy=[], free_energy=[], total_energy=[]
+    )
 
     with os.scandir(post_dir) as folder:
         conformer_dirs = [d for d in folder if d.is_dir()]
@@ -195,180 +206,76 @@ def run_xtb_conformers(
         cid = conformer_dir.name.split("_")[1]
         results["conformer_id"].append(cid)
 
-        enthalpy, entropy, free_energy = parse_xtb(xtb_output_file, logger)
+        enthalpy, entropy, free_energy, total_energy = parse_xtb(
+            xtb_output_file, config, logger
+        )
         logger.debug(
-            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}"
+            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}"
         )
         results["enthalpy"].append(enthalpy)
         results["entropy"].append(entropy)
         results["free_energy"].append(free_energy)
+        results["total_energy"].append(total_energy)
+    # Maybe there's a nicer way of doing this? ^
 
     results_file = os.path.join(post_dir, "results.csv")
-    logger.info(f"Writing {mol_type} results to {results_file}")
+    logger.info(f"Writing results to {results_file}")
 
-    results = pd.DataFrame(results)
+    results = pd.DataFrame(results, dtype=np.float64).sort_values("free_energy")
     results.to_csv(results_file, header=True, index=False)
 
-    logger.info(f"Finished writing {mol_type} results")
+    logger.info(f"Finished writing results for {mol_type} (smiles: {smiles})")
 
 
-def run_xtb(monomer_smiles, n_conformers, args, config, logger):
-    """
-    Calculates the thermodynamic parameters of the Ring-Opening Reaction (ROR) of a given monomer SMILES
-    """
-    try:
-        run_xtb_conformers(
-            smiles=config["initiator"]["smiles"],
-            mol_type="initiator",
-            args=args,
-            config=config,
-            logger=logger,
+def compile_results(monomer_smiles, args, config, logger):
+    results = dict()
+    step1_dir = os.path.join(args.output, "step1")
+    monomer_dir = os.path.join(step1_dir, f"monomer_{monomer_smiles}")
+    monomer_results_file = os.path.join(monomer_dir, "post", "results.csv")
+    monomer_results = pd.read_csv(
+        monomer_results_file, header=0, index_col="conformer_id", dtype=np.float64
+    )
+    results["monomer"] = monomer_results.iloc[0].to_dict()
+
+    with os.scandir(step1_dir) as folder:
+        polymer_dirs = [
+            d
+            for d in folder
+            if (d.is_dir() and (f"polymer_{monomer_smiles}" in d.name))
+        ]
+
+    for polymer_dir in polymer_dirs:
+        polymer_length = polymer_dir.name.split("_")[2]
+        polymer_results_file = os.path.join(polymer_dir, "post", "results.csv")
+        polymer_results = pd.read_csv(
+            polymer_results_file, header=0, index_col="conformer_id", dtype=np.float64
         )
-
-        run_xtb_conformers(
-            smiles=monomer_smiles,
-            n_conformers=config["initiator"]["n_conformers"],
-            mol_type="initiator",
-            args=args,
-            config=config,
-            logger=logger,
-        )
-
-        monomer_smiles = StandardizeSmiles(monomer_smiles)
-
-        run_name = f"{count}_{lactone_smiles}_{num_conf}conformers_{num_repeat}repeatunits_{init}initiator_{solvent}solvent_{temp}K"
-
-        repeating_bb = lactone_to_repeating_unit(lactone_smiles)
-        num_repeat_units = repeating(num_repeat, "B")
-        orientation_str = f"0, {repeating(num_repeat, ' 1, ')} {float(0.5)}"
-        num_repeat_orient = tuple(map(float, orientation_str.split(", ")))
-
-        polymer = build_polymer(
-            initial_bb, repeating_bb, final_bb, num_repeat_units, num_repeat_orient
-        )
-        molecule_smiles = stk_to_smiles(polymer)
-        ind_poly = 0
-        ind_poly = increment(ind_poly)
-        molecule = molecule_smiles
-
-        Polylactone(
-            molecule,
-            ind_poly,
-            num_conf,
-            solvent,
-            temp,
-            num_repeat,
-            gfn_method,
-            threads,
-            ohess_level,
-            mmffv,
-        )
-        shutil.move(r"starting_polymers", r"Polymer_1")
-
-        initiator_enthalpy, initiator_entropy, initiator_gibbs = data_extraction(
-            "initiator_0/G_all_0.txt",
-            "initiator_0/H_all_0.txt",
-            "initiator_0/S_all_0.txt",
-            energy_option,
-            conf_counter,
-            temp,
-            "initiator",
-        )
-        lactone_enthalpy, lactone_entropy, lactone_gibbs = data_extraction(
-            "Lactone_Ring_0/G_all_0.txt",
-            "Lactone_Ring_0/H_all_0.txt",
-            "Lactone_Ring_0/S_all_0.txt",
-            energy_option,
-            conf_counter,
-            temp,
-            "lactone",
-        )
-        polymer_enthalpy, polymer_entropy, polymer_gibbs = data_extraction(
-            "Polymer_1/G_all_1.txt",
-            "Polymer_1/H_all_1.txt",
-            "Polymer_1/S_all_1.txt",
-            energy_option,
-            conf_counter,
-            temp,
-            "polymer",
-        )
-
-        x = run_name
-        os.path.join(x)
-
-        if not os.path.exists(x):
-            os.makedirs(x)
+        if "polymer" in results:
+            results["polymer"][polymer_length] = polymer_results.iloc[0].to_dict()
         else:
-            print("File name already exists")
+            results["polymer"] = dict()
+            results["polymer"][polymer_length] = polymer_results.iloc[0].to_dict()
 
-        path = run_name
-        shutil.move(r"Lactone_Ring_0", path)
-        shutil.move(r"initiator_0", path)
-        shutil.move(r"Polymer_1", path)
-        shutil.move(r"initial_polymer.xyz", path)
+    compiled_results = dict(polymer_length=[], monomer_enthalpy=[], polymer_enthalpy=[])
 
-        reactant_enthalpy = initiator_enthalpy + num_repeat * lactone_enthalpy
-        reactant_entropy = initiator_entropy + num_repeat * lactone_entropy
-        reactant_gibbs = initiator_gibbs + num_repeat * lactone_gibbs
-
-        reaction_enthalpy = float(polymer_enthalpy - reactant_enthalpy)
-        reaction_entropy = float(polymer_entropy - reactant_entropy)
-        reaction_gibbs = float(polymer_gibbs - reactant_gibbs)
-
-        result_data = {
-            "Lactone_SMILES": [lactone_smiles],
-            "Repeating_Unit_SMILES": [repeating_bb],
-            "Polymer_SMILES": [molecule_smiles],
-            "ΔG (J/mol)": [reaction_gibbs],
-            "ΔH (J/mol)": [reaction_enthalpy],
-            "ΔS (J/mol/K)": [reaction_entropy],
-        }
-
-        # Convert to DataFrame
-        result_df = pd.DataFrame(result_data)
-
-        # Define the path for the individual CSV file
-        individual_csv_path = os.path.join(run_name, f"result_smiles{count}.csv")
-
-        # Save to CSV
-        result_df.to_csv(individual_csv_path, index=False)
-
-        # Copy the corresponding conf_pop files to their respective directories
-        conf_pop_src_initiator = os.path.join(
-            "conf_pop_files", f"initiator_confpop_smiles{conf_counter}.csv"
+    for polymer_length in results["polymer"].keys():
+        compiled_results["polymer_length"].append(int(polymer_length))
+        compiled_results["monomer_enthalpy"].append(results["monomer"]["enthalpy"])
+        compiled_results["polymer_enthalpy"].append(
+            results["polymer"][polymer_length]["enthalpy"]
         )
-        conf_pop_dst_initiator = os.path.join(
-            run_name, "initiator_0", f"initiator_confpop_smiles{count}.csv"
-        )
-        shutil.copy(conf_pop_src_initiator, conf_pop_dst_initiator)
 
-        conf_pop_src_lactone = os.path.join(
-            "conf_pop_files", f"lactone_confpop_smiles{conf_counter}.csv"
-        )
-        conf_pop_dst_lactone = os.path.join(
-            run_name, "Lactone_Ring_0", f"lactone_confpop_smiles{count}.csv"
-        )
-        shutil.copy(conf_pop_src_lactone, conf_pop_dst_lactone)
+    compiled_results_file = os.path.join(step1_dir, f"results_{monomer_smiles}.csv")
 
-        conf_pop_src_polymer = os.path.join(
-            "conf_pop_files", f"polymer_confpop_smiles{conf_counter}.csv"
-        )
-        conf_pop_dst_polymer = os.path.join(
-            run_name, "Polymer_1", f"polymer_confpop_smiles{count}.csv"
-        )
-        shutil.copy(conf_pop_src_polymer, conf_pop_dst_polymer)
+    compiled_results = pd.DataFrame(compiled_results).sort_values("polymer_length")
+    compiled_results["unit_polymer_enthalpy"] = (
+        compiled_results["polymer_enthalpy"] / compiled_results["polymer_length"]
+    )
+    compiled_results["delta_h"] = (
+        compiled_results["unit_polymer_enthalpy"] - compiled_results["monomer_enthalpy"]
+    )
 
-        return (
-            molecule_smiles,
-            repeating_bb,
-            run_name,
-            reaction_enthalpy,
-            reaction_entropy,
-            reaction_gibbs,
-        )
-    except Exception as e:
-        logger.error(f"Error in run_xtb for {lactone_smiles}: {e}")
-        raise
+    compiled_results.to_csv(compiled_results_file, header=True, index=False)
 
 
 def main(args, config, logger):
@@ -381,7 +288,7 @@ def main(args, config, logger):
     output_dir = os.path.join(args.output, "step1")
     create_dir(output_dir, logger)
 
-    # run xtb for initiator in ROR reaction
+    # run xtb for initiator if ROR reaction
     if config["reaction"]["type"] == "ROR":
         run_xtb_conformers(
             smiles=config["initiator"]["smiles"],
@@ -391,23 +298,30 @@ def main(args, config, logger):
             config=config,
             logger=logger,
         )
+
     # iterate over monomers in input list
-    for monomer_smiles in monomer_smiles:
+    for smiles in tqdm(monomer_smiles, desc="iterating over monomers"):
+        # TODO: need to decide how many conformers to generate
+        # ring_size = get_ring_size(smiles)
+        # logger.debug(f"Computed ring size: {ring_size}")
+
         # run xtb for monomer
         run_xtb_conformers(
-            smiles=monomer_smiles,
+            smiles=smiles,
             mol_type="monomer",
-            dir_name=monomer_smiles,
+            dir_name=smiles,
             args=args,
             config=config,
             logger=logger,
         )
 
         # iterate over polymer lengths
-        for length in config["reaction"]["lengths"]:
+        for length in tqdm(
+            config["reaction"]["lengths"], desc="iterating over polymer lengths"
+        ):
             # build polymer
             polymer_smiles = build_polymer(
-                monomer_smiles=monomer_smiles,
+                monomer_smiles=smiles,
                 length=length,
                 reaction_type=config["reaction"]["type"],
                 config=config,
@@ -415,121 +329,20 @@ def main(args, config, logger):
             )
             if polymer_smiles is None:
                 logger.warning(
-                    f"Failed to build polymer of length {length}, moving onto next length"
+                    f"Failed to build polymer of length {length}, moving onto next monomer"
                 )
-                continue
+                break
             # run xtb for polymer
             run_xtb_conformers(
                 smiles=polymer_smiles,
                 mol_type="polymer",
-                dir_name=f"{monomer_smiles}_{length}",
+                dir_name=f"{smiles}_{length}",
                 args=args,
                 config=config,
                 logger=logger,
             )
 
-    # run xTB calculations
-    count = 1  # Start count from 1
-    conf_counter = 1  # Initialize the counter for conf_pop files
-
-    # setup conformer dir
-    conformer_dir = os.path.join(args.output, "step1", "conformers")
-
-    logger.info(f"Creating output directory for conformers")
-    logger.info(f"Conformer dir: {conformer_dir}")
-
-    try:
-        os.mkdir(conformer_dir)
-        logger.info(f"Output directory {conformer_dir} created")
-    except FileExistsError:
-        logger.warning(f"Output directory {conformer_dir} already exists")
-        os.makedirs(conformer_dir, exist_ok=True)
-
-    # Initialize dictionary to store the results
-    results = {
-        "monomer_smiles": [],
-        "repeating_block_smiles": [],
-        "polymer_smiles": [],
-        "Ring Size": [],
-        "reaction_enthalpy (J/mol)": [],
-        "reaction_entropy (J/mol/K)": [],
-        "reaction_gibbs (J/mol)": [],
-    }
-
-    for i, smiles in enumerate(monomer_smiles):
-        logger.info(f"Processing SMILES ({i + 1}/{len(monomer_smiles)}): {smiles}")
-
-        ring_size = get_ring_size(smiles)
-        logger.debug(f"Computed ring size: {ring_size}")
-
-        n_conformers = ring_size * config["num_conf"]
-        logger.debug(f"Number of conformers to generate: {n_conformers}")
-
-        try:
-            (
-                molecule_smiles,
-                repeating_bb,
-                run_name,
-                reaction_enthalpy,
-                reaction_entropy,
-                reaction_gibbs,
-            ) = run_xtb(
-                i,
-                smiles,
-                n_conformers,
-                num_repeat,
-                initiator_opt,
-                solvent,
-                temp,
-                energy_option,
-                conf_counter,
-                gfn_method,
-                threads,
-                ohess_level,
-                mmffv,
-            )
-            if "OOC" not in molecule_smiles:  # WHY?
-                # Append results to the lists
-                results["count"].append(count)
-                results["lactone_smiles"].append(i)
-                results["repeating_block_smiles"].append(repeating_bb)
-                results["polymer_smiles"].append(molecule_smiles)
-                try:
-                    ring_size = get_ring_size(i)
-                except ValueError as e:
-                    logger.error(f"Error getting ring size: {e}")
-                    ring_size = "Unknown"
-                results["Ring Size"].append(ring_size)
-                results["reaction_enthalpy (J/mol)"].append(f"{reaction_enthalpy:.3f}")
-                results["reaction_entropy (J/mol/K)"].append(f"{reaction_entropy:.3f}")
-                results["reaction_gibbs (J/mol)"].append(f"{reaction_gibbs:.3f}")
-
-                # Increment the counter for each conf_pop file generated
-                conf_counter += 1
-                count += 1
-
-                # Call process_lactone_entry to save the most stable xtbopt files in the main SMILES folder
-                process_lactone_entry(run_name, run_name, run_name)
-            else:
-                logger.info(
-                    f"This polymer {molecule_smiles} contained OOC and was skipped."
-                )
-                continue
-        except Exception as e:
-            logger.error(f"run_xtb did not work for SMILES {i}: {e}")
-            paths = ["initiator_0", "Lactone_Ring_0", "Polymer_1"]
-            for path in paths:
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
-                else:
-                    logger.error(f"The directory {path} does not exist")
-            continue
-
-    # Convert results to a DataFrame and save as CSV
-    df = pd.DataFrame(results)
-    df.to_csv("combined_results.csv", index=False)
-
-    print(monomer_smiles)
+        compile_results(monomer_smiles=smiles, args=args, config=config, logger=logger)
 
 
 if __name__ == "__main__":

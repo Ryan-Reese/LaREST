@@ -2,8 +2,8 @@
 title = "Step 1 Config"
 
 [reaction]
-type = "ROR"
-lengths = [2, 3, 4, 5, 6]
+type = "RER"
+lengths = [2]
 
 [monomer]
 n_conformers = 20
@@ -23,9 +23,6 @@ precision = 6
 mmff = "MMFF94"
 mmff_iters = 200
 align_iters = 50
-
-num_repeat = 1
-energy_option = 1
 
 [xtb]
 ohess = "vtight"

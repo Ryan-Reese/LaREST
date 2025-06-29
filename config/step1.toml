@@ -2,7 +2,7 @@
 title = "Step 1 Config"
 
 [reaction]
-type = "RER"
+type = "RER" # ["RER", "ROR"]
 lengths = [2]
 
 [monomer]

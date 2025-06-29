@@ -28,7 +28,6 @@ from larest.constants import KCALMOL_TO_JMOL
 from larest.helpers import (
     build_polymer,
     create_dir,
-    get_ring_size,
     get_xtb_args,
     parse_monomer_smiles,
     parse_xtb,
@@ -58,7 +57,7 @@ def generate_conformer_energies(
         numThreads=config["rdkit"]["threads"],
     )
 
-    logger.debug(f"Optimising {n_conformers} conformers for Mol object")
+    logger.debug(f"Optimising the {n_conformers} conformers for Mol object")
     MMFFOptimizeMoleculeConfs(
         mol,
         numThreads=config["rdkit"]["threads"],
@@ -83,8 +82,12 @@ def generate_conformer_energies(
         ],
         key=lambda x: x[1],  # sort by energies
     )
+    debug_view = list(zip(*conformer_energies))
+    debug_view = pd.DataFrame(dict(cid=debug_view[0], energy=debug_view[1]))
+    debug_view = debug_view.set_index("cid")
+    logger.debug(debug_view.to_string())
 
-    logger.debug(f"Aligning {n_conformers} conformers by their geometries")
+    logger.debug(f"Aligning the {n_conformers} conformers by their geometries")
     AlignMolConformers(mol, maxIters=config["rdkit"]["align_iters"])
 
     return mol, conformer_energies
@@ -92,6 +95,7 @@ def generate_conformer_energies(
 
 def run_xtb_conformers(
     smiles: str,
+    n_conformers: int,
     mol_type: Literal["monomer", "initiator", "polymer"],
     dir_name: str,
     args: argparse.Namespace,
@@ -102,10 +106,12 @@ def run_xtb_conformers(
     Calculates the thermodynamic parameters of the molecule with the specified SMILES string
     """
 
-    logger.info(f"Computing thermodynamic parameters of {mol_type} ({smiles})")
+    logger.debug(
+        f"Genering conformers and computing their energies of {mol_type} ({smiles}) using RDKit"
+    )
 
     # Create output dirs
-    mol_dir = os.path.join(args.output, "step1", f"{mol_type}_{dir_name}")
+    mol_dir = os.path.join(args.output, "step1", f"{dir_name}")
     create_dir(mol_dir, logger)
     pre_dir = os.path.join(mol_dir, "pre")
     create_dir(pre_dir, logger)
@@ -113,28 +119,34 @@ def run_xtb_conformers(
     create_dir(post_dir, logger)
 
     # Generate and write conformers in .sdf files
-    logger.info("Generating conformers and their energies using RDKit")
+    logger.debug("Generating conformers and their energies using RDKit")
     mol, conformer_energies = generate_conformer_energies(
-        smiles=StandardizeSmiles(smiles),  # USE CANONICAL SMILES
-        n_conformers=config[mol_type]["n_conformers"],
+        smiles=StandardizeSmiles(smiles),  # USES CANONICAL SMILES
+        n_conformers=n_conformers,
         args=args,
         config=config,
         logger=logger,
     )
-    logger.info("Finished generating conformers")
+    logger.debug("Finished generating conformers")
 
     # Write conformers to .sdf file
     sdf_file = os.path.join(pre_dir, "conformers.sdf")
     logger.debug(f"Writing conformers and their energies to {sdf_file}")
 
-    with open(sdf_file, "w") as fstream:
-        writer = SDWriter(fstream)
-        for cid, energy in conformer_energies:
-            mol.SetIntProp("conformer_id", cid)
-            mol.SetDoubleProp("energy", energy)
-            writer.write(mol, confId=cid)
-        writer.close()
-    logger.debug("Finished writing conformers and their energies")
+    try:
+        with open(sdf_file, "w") as fstream:
+            writer = SDWriter(fstream)
+            for cid, energy in conformer_energies:
+                mol.SetIntProp("conformer_id", cid)
+                mol.SetDoubleProp("energy", energy)
+                writer.write(mol, confId=cid)
+            writer.close()
+    except Exception as err:
+        logger.exception(err)
+        logger.error(f"Failed to write RDKit conformers to {sdf_file}")
+        raise
+    else:
+        logger.debug("Finished writing conformers and their energies")
 
     # Write conformers to .xyz files
     logger.debug(f"Getting conformer coordinates from {sdf_file}")
@@ -144,22 +156,29 @@ def run_xtb_conformers(
     )
 
     # Iterating over conformers
-    logger.info("Computing thermodynamic parameters of conformers using xTB")
+    logger.debug("Computing thermodynamic parameters of conformers using xTB")
     for conformer in tqdm(
         mol_supplier,
         desc="iterating over conformers",
-        total=config[mol_type]["n_conformers"],
+        total=n_conformers,
     ):
         # Conformer id and location of xyz file
         cid = conformer.GetIntProp("conformer_id")
         xyz_file = os.path.join(pre_dir, f"conformer_{cid}.xyz")
 
         logger.debug(f"Writing conformer {cid} coordinates to {xyz_file}")
-        MolToXYZFile(
-            mol=mol,
-            filename=xyz_file,
-            precision=config["rdkit"]["precision"],
-        )
+        try:
+            MolToXYZFile(
+                mol=mol,
+                filename=xyz_file,
+                precision=config["rdkit"]["precision"],
+            )
+        except Exception as err:
+            logger.exception(err)
+            logger.error(f"Failed to write conformer coordinates to {xyz_file}")
+            raise
+        else:
+            logger.debug(f"Finished writing conformers {cid} coordinates")
 
         # Creating output dir for conformer post-xtb
         conformer_dir = os.path.join(post_dir, f"conformer_{cid}")
@@ -179,18 +198,27 @@ def run_xtb_conformers(
         ] + get_xtb_args(config, logger)
 
         logger.debug(f"Running xTB on conformer {cid}")
-        with open(xtb_output_file, "w") as fstream:
-            subprocess.Popen(
-                args=xtb_args,
-                stdout=fstream,
-                stderr=subprocess.STDOUT,
-                cwd=conformer_dir,
-            ).wait()
-        logger.debug(f"Finished running xTB on conformer {cid}")
+        try:
+            with open(xtb_output_file, "w") as fstream:
+                subprocess.Popen(
+                    args=xtb_args,
+                    stdout=fstream,
+                    stderr=subprocess.STDOUT,
+                    cwd=conformer_dir,
+                ).wait()
+        except Exception as err:
+            logger.exception(err)
+            logger.error(
+                f"Failed to run xTB command with arguments {xtb_args} in {conformer_dir}"
+            )
+        else:
+            logger.debug(
+                f"Finished running xTB on conformer {cid} with output saved to {xtb_output_file}"
+            )
     sdfstream.close()
-    logger.info("Finished running xTB on conformers")
+    logger.debug("Finished running xTB on conformers")
 
-    logger.info("Compiling results of xTB computations")
+    logger.debug("Compiling results of xTB computations")
     results = dict(
         conformer_id=[], enthalpy=[], entropy=[], free_energy=[], total_energy=[]
     )
@@ -201,30 +229,27 @@ def run_xtb_conformers(
 
     for conformer_dir in conformer_dirs:
         xtb_output_file = os.path.join(conformer_dir, f"{conformer_dir.name}.txt")
-        logger.debug(f"Searching for results in file {xtb_output_file}")
 
-        cid = conformer_dir.name.split("_")[1]
-        results["conformer_id"].append(cid)
-
-        enthalpy, entropy, free_energy, total_energy = parse_xtb(
-            xtb_output_file, config, logger
-        )
-        logger.debug(
-            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}"
-        )
-        results["enthalpy"].append(enthalpy)
-        results["entropy"].append(entropy)
-        results["free_energy"].append(free_energy)
-        results["total_energy"].append(total_energy)
-    # Maybe there's a nicer way of doing this? ^
+        try:
+            enthalpy, entropy, free_energy, total_energy = parse_xtb(
+                xtb_output_file, config, logger
+            )
+        except Exception:
+            continue
+        else:
+            results["conformer_id"].append(conformer_dir.name.split("_")[1])
+            results["enthalpy"].append(enthalpy)
+            results["entropy"].append(entropy)
+            results["free_energy"].append(free_energy)
+            results["total_energy"].append(total_energy)
 
     results_file = os.path.join(post_dir, "results.csv")
-    logger.info(f"Writing results to {results_file}")
+    logger.debug(f"Writing results to {results_file}")
 
     results = pd.DataFrame(results, dtype=np.float64).sort_values("free_energy")
     results.to_csv(results_file, header=True, index=False)
 
-    logger.info(f"Finished writing results for {mol_type} (smiles: {smiles})")
+    logger.debug(f"Finished writing results for {mol_type} ({smiles})")
 
 
 def compile_results(monomer_smiles, args, config, logger):
@@ -280,8 +305,8 @@ def compile_results(monomer_smiles, args, config, logger):
 
 def main(args, config, logger):
     # get input monomer SMILES strings
-
-    monomer_smiles = parse_monomer_smiles(args, logger)
+    logger.info("Attempting to read input monomer smiles")
+    monomer_smiles_list = parse_monomer_smiles(args, logger)
     logger.info("Finished reading input monomer smiles")
 
     # setup output dir
@@ -289,44 +314,64 @@ def main(args, config, logger):
     create_dir(output_dir, logger)
 
     # run xtb for initiator if ROR reaction
+    logger.info("Running xTB for initiator for ROR reaction")
     if config["reaction"]["type"] == "ROR":
-        run_xtb_conformers(
-            smiles=config["initiator"]["smiles"],
-            mol_type="initiator",
-            dir_name=config["initiator"]["smiles"],
-            args=args,
-            config=config,
-            logger=logger,
-        )
+        initiator_smiles = config["initiator"]["smiles"]
+        initiator_n_conformers = config["initiator"]["n_conformers"]
+        initiator_dir_name = os.path.join("initiator", initiator_smiles)
+        try:
+            run_xtb_conformers(
+                smiles=initiator_smiles,
+                n_conformers=initiator_n_conformers,
+                mol_type="initiator",
+                dir_name=initiator_dir_name,
+                args=args,
+                config=config,
+                logger=logger,
+            )
+        except Exception:
+            logger.error("Failed to run xTB for initiator")
+            raise SystemExit(1)
+        else:
+            logger.info("Finished running xTB for initiator")
 
     # iterate over monomers in input list
-    for smiles in tqdm(monomer_smiles, desc="iterating over monomers"):
+    for monomer_smiles in tqdm(monomer_smiles_list, desc="Running xTB for monomers"):
         # TODO: need to decide how many conformers to generate
         # ring_size = get_ring_size(smiles)
         # logger.debug(f"Computed ring size: {ring_size}")
 
         # run xtb for monomer
+        monomer_n_conformers = config["monomer"]["n_conformers"]
+        monomer_dir_name = os.path.join("monomer", monomer_smiles)
+
         run_xtb_conformers(
-            smiles=smiles,
+            smiles=monomer_smiles,
+            n_conformers=monomer_n_conformers,
             mol_type="monomer",
-            dir_name=smiles,
+            dir_name=monomer_dir_name,
             args=args,
             config=config,
             logger=logger,
         )
 
         # iterate over polymer lengths
-        for length in tqdm(
-            config["reaction"]["lengths"], desc="iterating over polymer lengths"
+        for polymer_length in tqdm(
+            config["reaction"]["lengths"], desc="Running xTB for each polymer length"
         ):
             # build polymer
-            polymer_smiles = build_polymer(
-                monomer_smiles=smiles,
-                length=length,
-                reaction_type=config["reaction"]["type"],
-                config=config,
-                logger=logger,
-            )
+            try:
+                polymer_smiles = build_polymer(
+                    monomer_smiles=monomer_smiles,
+                    polymer_length=polymer_length,
+                    reaction_type=config["reaction"]["type"],
+                    config=config,
+                    logger=logger,
+                )
+            except Exception:
+                pass
+            else:
+                pass
             if polymer_smiles is None:
                 logger.warning(
                     f"Failed to build polymer of length {length}, moving onto next monomer"
@@ -351,28 +396,39 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load logging config from config dir
+    logging_config_file = os.path.join(args.config, "logging.toml")
     try:
-        with open(f"{args.config}/logging.toml", "rb") as fstream:
+        with open(logging_config_file, "rb") as fstream:
             log_config = tomllib.load(fstream)
-            log_config["handlers"]["file"]["filename"] = f"{args.output}/larest.log"
-    except Exception as e:
-        print(e)
-        raise SystemExit(1)
-
-    logging.config.dictConfig(log_config)
-    logger = logging.getLogger("Step 1")
-    logger.info("Logging config loaded")
+    except:
+        print(f"Failed to load logging config from {logging_config_file}")
+        raise
+    else:
+        log_config["handlers"]["file"]["filename"] = f"{args.output}/larest.log"
+        logging.config.dictConfig(log_config)
+        logger = logging.getLogger("Step 1")
+        logger.info("Logging config loaded")
 
     # load step 1 config
+    step1_config_file = os.path.join(args.config, "step1.toml")
+
     try:
-        with open(f"{args.config}/step1.toml", "rb") as fstream:
+        with open(step1_config_file, "rb") as fstream:
             config = tomllib.load(fstream)
-            logger.info("Step 1 config loaded")
-    except Exception as e:
-        logger.exception(e)
-        logger.error("Failed to load Step 1 config")
+    except Exception as err:
+        logger.exception(err)
+        logger.error(f"Failed to load Step 1 config from {step1_config_file}")
         raise SystemExit(1)
+    else:
+        logger.info("Step 1 config loaded")
 
     # TODO: write assertions for config
 
-    main(args, config, logger)
+    # main(args, config, logger)
+    generate_conformer_energies(
+        config["initiator"]["smiles"],
+        config["initiator"]["n_conformers"],
+        args,
+        config,
+        logger,
+    )

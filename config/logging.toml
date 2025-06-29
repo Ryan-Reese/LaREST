@@ -21,4 +21,5 @@ formatter = "default"
 
 [root]
 handlers = ["file", "stream"]
-level = "INFO"
+level = "DEBUG" # most of the time you're just adjusting this
+# ["DEBUG", "INFO"]

@@ -1,8 +1,8 @@
 !#/usr/bin/bash
 
-# WARN: this script should be run from larest
+# WARN: this script should be run from "larest" directory
 
-# TODO: confirm these job sizes
+# NOTE: modifiable job sizes for HPC
 
 #PBS -N LaREST
 #PBS -l walltime=01:00:00
@@ -21,12 +21,12 @@ conda activate ${CONDA_ENV}
 # create run directory
 DATETIME="$(date '+%Y%m%d%H%M%S')"
 RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}/larest_${DATETIME}"
-mkdir -p "${RUN_DIR}/${CONFIG_DIR}"
+mkdir -p "${RUN_DIR}"
 
 # copy config to run directory
 cp -r "${PBS_O_WORKDIR}/${CONFIG_DIR}" "${RUN_DIR}"
 
-# run step 1 of pipeline (xTB)
+# run Step 1 of pipeline (xTB)
 python "${PBS_O_WORKDIR}/${SRC_DIR}/step1.py" -o "${RUN_DIR}" -c "${RUN_DIR}/${CONFIG_DIR}"
 
 # run step 2 of pipeline (CREST)

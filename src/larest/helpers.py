@@ -10,6 +10,7 @@ from rdkit.Chem.rdmolfiles import MolFromSmarts, MolFromSmiles, MolToSmiles
 from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams, molzip
 
 from larest.constants import HARTTREE_TO_JMOL, INITIATOR_GROUPS, MONOMER_GROUPS
+from larest.exceptions import PolymerUnitError
 
 
 def get_mol(smiles: str) -> Mol:
@@ -37,9 +38,10 @@ def create_dir(dir_path: str | Path, logger: logging.Logger) -> None:
 
     try:
         os.makedirs(dir_path, exist_ok=False)
-        logger.debug(f"Directory {dir_path} created")
     except FileExistsError:
         logger.warning(f"Directory {dir_path} already exists")
+    else:
+        logger.debug(f"Directory {dir_path} created")
 
 
 def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
@@ -48,13 +50,15 @@ def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
         for k, v in zip(config["xtb"].keys(), config["xtb"].values()):
             xtb_args.append(f"--{k}")
             xtb_args.append(str(v))
-        logger.debug(f"Returning xtb args: {xtb_args}")
-    except Exception as e:
-        logger.exception(e)
+    except Exception as err:
+        logger.exception(err)
         logger.warning(
             f"Failed to parse xtb arguments from dictionary {config['xtb']}, using default xtb arguments"
         )
-    return xtb_args
+        return []
+    else:
+        logger.debug(f"Returning xtb args: {xtb_args}")
+        return xtb_args
 
 
 def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> list[str]:
@@ -64,15 +68,14 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
     try:
         with open(input_file, "r") as fstream:
             monomer_smiles = fstream.read().splitlines()
-            for i, smiles in enumerate(monomer_smiles):
-                logger.debug(f"Read monomer {i}: {smiles}")
-
-        logger.debug(f"Input monomer smiles: {monomer_smiles}")
-        return monomer_smiles
-    except Exception as e:
-        logger.exception(e)
+    except Exception as err:
+        logger.exception(err)
         logger.error("Failed to read input monomer smiles")
         raise SystemExit(1)
+    else:
+        for i, smiles in enumerate(monomer_smiles):
+            logger.debug(f"Read monomer {i}: {smiles}")
+        return monomer_smiles
 
 
 def parse_xtb(
@@ -80,24 +83,48 @@ def parse_xtb(
 ) -> tuple[float | None, float | None, float | None, float | None]:
     enthalpy, entropy, free_energy, total_energy = None, None, None, None
 
-    with open(xtb_output_file, "r") as fstream:
-        for line in fstream:
-            try:
+    logger.debug(f"Searching for results in file {xtb_output_file}")
+    try:
+        with open(xtb_output_file, "r") as fstream:
+            for i, line in enumerate(fstream):
                 if "TOTAL ENERGY" in line:
-                    total_energy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                    try:
+                        total_energy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                    except Exception as err:
+                        logger.exception(err)
+                        logger.error(
+                            f"Failed to extract total energy from line {i}: {line}"
+                        )
                 elif "TOTAL ENTHALPY" in line:
-                    enthalpy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                    try:
+                        enthalpy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                    except Exception as err:
+                        logger.exception(err)
+                        logger.error(
+                            f"Failed to extract total enthalpy from line {i}: {line}"
+                        )
                 elif "TOTAL FREE ENERGY" in line:
-                    free_energy = float(line.split()[4]) * HARTTREE_TO_JMOL
-            except Exception as e:
-                logger.exception(e)
-
-    if not (enthalpy and free_energy and total_energy):
-        logger.warning(
-            f"Failed to extract all data from {xtb_output_file}, missing data will be assigned None"
-        )
+                    try:
+                        free_energy = float(line.split()[4]) * HARTTREE_TO_JMOL
+                    except Exception as err:
+                        logger.exception(err)
+                        logger.error(
+                            f"Failed to extract total free energy from line {i}: {line}"
+                        )
+    except Exception as err:
+        logger.exception(err)
+        logger.error(f"Failed to parse xtb results from {xtb_output_file}")
+        raise
     else:
-        entropy = (enthalpy - free_energy) / config["xtb"]["etemp"]
+        if enthalpy and free_energy:
+            entropy = (enthalpy - free_energy) / config["xtb"]["etemp"]
+        if not (enthalpy and free_energy and total_energy):
+            logger.warning(
+                f"Failed to extract necessary data from {xtb_output_file}, missing data will be assigned None"
+            )
+        logger.debug(
+            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}"
+        )
 
     return enthalpy, entropy, free_energy, total_energy
 
@@ -109,12 +136,11 @@ def get_polymer_unit(
     back_dummy: str,
     logger: logging.Logger,
 ) -> Mol | None:
-    # NOTE: takes the first found match (does not support molecules with >1 possible
-    # functional group at the moment)
+    # WARNING: does not support molecules with >1 ring-opening functional group
 
     if mol_type == "monomer":
         functional_groups = [MolFromSmarts(fg) for fg in MONOMER_GROUPS]
-    else:
+    elif mol_type == "initiator":
         functional_groups = [MolFromSmarts(fg) for fg in INITIATOR_GROUPS]
 
     # convert monomer/initiator smiles and front/back dummies to Mols
@@ -144,8 +170,9 @@ def get_polymer_unit(
 
     # no functional group detected in monomer/initiator
     if len(fg_atom_idx) == 0:
-        logger.error(f"No functional group atom ids found for {mol_type} {smiles}")
-        return None
+        raise PolymerUnitError(
+            f"No functional group atom ids found for {mol_type} {smiles}"
+        )
 
     # creating an editable Mol and breaking fg bond
     emol = EditableMol(mol)
@@ -170,25 +197,32 @@ def get_polymer_unit(
 
 def build_polymer(
     monomer_smiles: str,
-    length: int,
+    polymer_length: int,
     reaction_type: Literal["ROR", "RER"],
     config: dict[str, Any],
     logger: logging.Logger,
 ) -> Mol | None:
-    if length <= 1:
-        logger.error(f"Please specify a polymer length > 1 (current length: {length}")
-        return None
+    if polymer_length <= 1 and reaction_type == "RER":
+        logger.error(
+            f"Please specify a polymer length > 1 for RER reaction (current length: {polymer_length}"
+        )
+        raise ValueError
+    elif polymer_length < 1 and reaction_type == "ROR":
+        logger.error(
+            f"Please specify a polymer length >= 1 for ROR reaction (current length: {polymer_length}"
+        )
+        raise ValueError
 
     mol_zip_params = MolzipParams()
     mol_zip_params.label = MolzipLabel.AtomType
 
-    logger.info(f"Attempting to build {reaction_type} polymer")
+    logger.debug(f"Attempting to build {reaction_type} polymer")
     if reaction_type == "ROR":
         logger.info(
-            f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['initiator']['smiles']}, length: {length}"
+            f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['initiator']['smiles']}, length: {polymer_length}"
         )
     else:
-        logger.info(f"Monomer smiles: {monomer_smiles}, length: {length}")
+        logger.info(f"Monomer smiles: {monomer_smiles}, length: {polymer_length}")
 
     polymer = get_polymer_unit(
         smiles=monomer_smiles,

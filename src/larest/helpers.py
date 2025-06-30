@@ -4,13 +4,14 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+import pandas as pd
 from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
 from rdkit.Chem.rdchem import BondType, EditableMol, Mol
 from rdkit.Chem.rdmolfiles import MolFromSmarts, MolFromSmiles, MolToSmiles
 from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams, molzip
 
 from larest.constants import HARTTREE_TO_JMOL, INITIATOR_GROUPS, MONOMER_GROUPS
-from larest.exceptions import PolymerUnitError
+from larest.exceptions import PolymerLengthError, PolymerUnitError
 
 
 def get_mol(smiles: str) -> Mol:
@@ -135,7 +136,7 @@ def get_polymer_unit(
     front_dummy: str,
     back_dummy: str,
     logger: logging.Logger,
-) -> Mol | None:
+) -> Mol:
     # WARNING: does not support molecules with >1 ring-opening functional group
 
     if mol_type == "monomer":
@@ -157,42 +158,53 @@ def get_polymer_unit(
             for substruct in mol.GetSubstructMatches(fg):
                 for atom_id in substruct:
                     if mol_type == "monomer":
+                        # break bond between cyclic atoms
                         if mol.GetAtomWithIdx(atom_id).IsInRing():
                             fg_atom_idx.append(atom_id)
                     else:
                         fg_atom_idx.append(atom_id)
                 if len(fg_atom_idx) != 0:
                     logger.debug(f"Functional group detected: {MolToSmiles(fg)}")
-                    logger.debug(f"Functional group atom ids: {fg_atom_idx}")
                     break
         if len(fg_atom_idx) != 0:
             break
 
     # no functional group detected in monomer/initiator
-    if len(fg_atom_idx) == 0:
-        raise PolymerUnitError(
-            f"No functional group atom ids found for {mol_type} {smiles}"
-        )
+    try:
+        if len(fg_atom_idx) == 0:
+            raise PolymerUnitError(
+                f"No functional group atom ids found for {mol_type} {smiles}"
+            )
+    except PolymerUnitError as err:
+        logger.exception(err)
+        raise
+    else:
+        logger.debug(f"Functional group atom ids: {fg_atom_idx}")
 
-    # creating an editable Mol and breaking fg bond
+    # creating an editable Mol
     emol = EditableMol(mol)
-    emol.RemoveBond(*fg_atom_idx)
-
-    # adding front dummy to first fg group atom
-    emol.AddBond(
-        beginAtomIdx=fg_atom_idx[0],
-        endAtomIdx=emol.AddAtom(front_dummy),
-        order=BondType.SINGLE,
-    )
-    # adding back dummy to second fg group atom
-    emol.AddBond(
-        beginAtomIdx=fg_atom_idx[1],
-        endAtomIdx=emol.AddAtom(back_dummy),
-        order=BondType.SINGLE,
-    )
-
-    logger.debug(f"Created polymer unit {MolToSmiles(emol.GetMol())}")
-    return emol.GetMol()
+    try:
+        # breaking functional group bond
+        emol.RemoveBond(*fg_atom_idx)
+        # adding front dummy to first fg group atom
+        emol.AddBond(
+            beginAtomIdx=fg_atom_idx[0],
+            endAtomIdx=emol.AddAtom(front_dummy),
+            order=BondType.SINGLE,
+        )
+        # adding back dummy to second fg group atom
+        emol.AddBond(
+            beginAtomIdx=fg_atom_idx[1],
+            endAtomIdx=emol.AddAtom(back_dummy),
+            order=BondType.SINGLE,
+        )
+    except Exception as err:
+        logger.exception(err)
+        logger.error(f"Failed to edit {mol_type} unit {MolToSmiles(emol.GetMol())}")
+        raise
+    else:
+        logger.debug(f"Created polymer unit {MolToSmiles(emol.GetMol())}")
+        return emol.GetMol()
 
 
 def build_polymer(
@@ -201,22 +213,21 @@ def build_polymer(
     reaction_type: Literal["ROR", "RER"],
     config: dict[str, Any],
     logger: logging.Logger,
-) -> Mol | None:
-    if polymer_length <= 1 and reaction_type == "RER":
-        logger.error(
-            f"Please specify a polymer length > 1 for RER reaction (current length: {polymer_length}"
-        )
-        raise ValueError
-    elif polymer_length < 1 and reaction_type == "ROR":
-        logger.error(
-            f"Please specify a polymer length >= 1 for ROR reaction (current length: {polymer_length}"
-        )
-        raise ValueError
+) -> str:
+    try:
+        if polymer_length <= 1 and reaction_type == "RER":
+            raise PolymerLengthError(
+                f"Please specify a polymer length > 1 for RER reaction (current length: {polymer_length})"
+            )
+        elif polymer_length < 1 and reaction_type == "ROR":
+            raise PolymerLengthError(
+                f"Please specify a polymer length >= 1 for ROR reaction (current length: {polymer_length}"
+            )
+    except PolymerLengthError as err:
+        logger.exception(err)
+        raise
 
-    mol_zip_params = MolzipParams()
-    mol_zip_params.label = MolzipLabel.AtomType
-
-    logger.debug(f"Attempting to build {reaction_type} polymer")
+    logger.debug(f"Building {reaction_type} polymer")
     if reaction_type == "ROR":
         logger.info(
             f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['initiator']['smiles']}, length: {polymer_length}"
@@ -224,22 +235,26 @@ def build_polymer(
     else:
         logger.info(f"Monomer smiles: {monomer_smiles}, length: {polymer_length}")
 
-    polymer = get_polymer_unit(
-        smiles=monomer_smiles,
-        mol_type="monomer",
-        front_dummy="Xe",
-        back_dummy="Y",
-        logger=logger,
-    )
-    if polymer is None:
+    mol_zip_params = MolzipParams()
+    mol_zip_params.label = MolzipLabel.AtomType
+
+    try:
+        polymer = get_polymer_unit(
+            smiles=monomer_smiles,
+            mol_type="monomer",
+            front_dummy="Xe",
+            back_dummy="Y",
+            logger=logger,
+        )
+    except Exception:
         logger.error(f"Failed to create monomer unit from {monomer_smiles}")
-        return None
+        raise
 
     monomer_units = 1
     front_dummy, back_dummy = "Y", "Zr"
     if reaction_type == "RER":
-        length -= 1
-    while monomer_units < length:
+        polymer_length -= 1
+    while monomer_units < polymer_length:
         repeating_unit = get_polymer_unit(
             smiles=monomer_smiles,
             mol_type="monomer",
@@ -248,12 +263,20 @@ def build_polymer(
             logger=logger,
         )
         mol_zip_params.setAtomSymbols([front_dummy])
-        polymer = molzip(polymer, repeating_unit, mol_zip_params)
-        front_dummy, back_dummy = back_dummy, front_dummy
-        monomer_units += 1
-        logger.debug(
-            f"Polymer chain with length={monomer_units}): {MolToSmiles(polymer)}"
-        )
+        try:
+            polymer = molzip(polymer, repeating_unit, mol_zip_params)
+        except Exception as err:
+            logger.exception(err)
+            logger.error(
+                f"Failed to zip polymer units together: {MolToSmiles(polymer)} {MolToSmiles(repeating_unit)}"
+            )
+            raise
+        else:
+            front_dummy, back_dummy = back_dummy, front_dummy
+            monomer_units += 1
+            logger.debug(
+                f"Polymer chain with length={monomer_units}): {MolToSmiles(polymer)}"
+            )
 
     terminal_config = dict(
         ROR=dict(
@@ -272,15 +295,37 @@ def build_polymer(
         ),
     )
 
-    terminal_unit = get_polymer_unit(**terminal_config[reaction_type])
-
-    if terminal_unit is None:
+    try:
+        terminal_unit = get_polymer_unit(**terminal_config[reaction_type])
+    except Exception:
         logger.error(
             f"Failed to create terminal group from {terminal_config[reaction_type]['smiles']}"
         )
-        return None
+        raise
 
     mol_zip_params.setAtomSymbols([front_dummy, "Xe"])
-    polymer = molzip(polymer, terminal_unit, mol_zip_params)
-    logger.info(f"Finished building {reaction_type} polymer: {MolToSmiles(polymer)}")
+    try:
+        polymer = molzip(polymer, terminal_unit, mol_zip_params)
+    except Exception as err:
+        logger.exception(err)
+        logger.error(
+            f"Failed to zip polymer and terminal unit together: {MolToSmiles(polymer)} {MolToSmiles(terminal_unit)}"
+        )
+        raise
+    else:
+        logger.info(
+            f"Finished building {reaction_type} polymer: {MolToSmiles(polymer)}"
+        )
     return MolToSmiles(polymer)
+
+
+def get_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:
+    results_file = os.path.join(mol_dir, "post", "results.csv")
+
+    results = pd.read_csv(
+        results_file, header=0, index_col="conformer_id", dtype=np.float64
+    )
+
+    # NOTE: The first row corresponds to the most stable conformer (lowest free energy, previously sorted)
+
+    return results.iloc[0].to_dict()

@@ -28,6 +28,7 @@ from larest.constants import KCALMOL_TO_JMOL
 from larest.helpers import (
     build_polymer,
     create_dir,
+    get_most_stable_conformer,
     get_xtb_args,
     parse_monomer_smiles,
     parse_xtb,
@@ -111,7 +112,7 @@ def run_xtb_conformers(
     )
 
     # Create output dirs
-    mol_dir = os.path.join(args.output, "step1", f"{dir_name}")
+    mol_dir = os.path.join(args.output, "step1", dir_name)
     create_dir(mol_dir, logger)
     pre_dir = os.path.join(mol_dir, "pre")
     create_dir(pre_dir, logger)
@@ -235,6 +236,9 @@ def run_xtb_conformers(
                 xtb_output_file, config, logger
             )
         except Exception:
+            logger.error(
+                f"Failed to parse xtb results for conformer in {conformer_dir.name}"
+            )
             continue
         else:
             results["conformer_id"].append(conformer_dir.name.split("_")[1])
@@ -252,55 +256,64 @@ def run_xtb_conformers(
     logger.debug(f"Finished writing results for {mol_type} ({smiles})")
 
 
-def compile_results(monomer_smiles, args, config, logger):
-    results = dict()
+def compile_monomer_results(
+    monomer_smiles: str,
+    reaction_type: Literal["ROR", "RER"],
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    logger: logging.Logger,
+) -> None:
+    data = dict(polymer=dict())
     step1_dir = os.path.join(args.output, "step1")
-    monomer_dir = os.path.join(step1_dir, f"monomer_{monomer_smiles}")
-    monomer_results_file = os.path.join(monomer_dir, "post", "results.csv")
-    monomer_results = pd.read_csv(
-        monomer_results_file, header=0, index_col="conformer_id", dtype=np.float64
-    )
-    results["monomer"] = monomer_results.iloc[0].to_dict()
+    monomer_dir = os.path.join(step1_dir, "monomer", monomer_smiles)
+    data["monomer"] = get_most_stable_conformer(monomer_dir)
 
-    with os.scandir(step1_dir) as folder:
+    # get initiator results if ROR reaction
+    if reaction_type == "ROR":
+        initiator_dir = os.path.join(
+            step1_dir, "initiator", config["initiator"]["smiles"]
+        )
+        data["initiator"] = get_most_stable_conformer(initiator_dir)
+
+    parent_polymer_dir = os.path.join(step1_dir, "polymer")
+    with os.scandir(parent_polymer_dir) as folder:
         polymer_dirs = [
-            d
-            for d in folder
-            if (d.is_dir() and (f"polymer_{monomer_smiles}" in d.name))
+            d for d in folder if (d.is_dir() and (monomer_smiles in d.name.split("_")))
         ]
 
     for polymer_dir in polymer_dirs:
-        polymer_length = polymer_dir.name.split("_")[2]
-        polymer_results_file = os.path.join(polymer_dir, "post", "results.csv")
-        polymer_results = pd.read_csv(
-            polymer_results_file, header=0, index_col="conformer_id", dtype=np.float64
-        )
-        if "polymer" in results:
-            results["polymer"][polymer_length] = polymer_results.iloc[0].to_dict()
-        else:
-            results["polymer"] = dict()
-            results["polymer"][polymer_length] = polymer_results.iloc[0].to_dict()
+        polymer_length = polymer_dir.name.split("_")[1]
+        data["polymer"][polymer_length] = get_most_stable_conformer(polymer_dir)
 
-    compiled_results = dict(polymer_length=[], monomer_enthalpy=[], polymer_enthalpy=[])
-
-    for polymer_length in results["polymer"].keys():
-        compiled_results["polymer_length"].append(int(polymer_length))
-        compiled_results["monomer_enthalpy"].append(results["monomer"]["enthalpy"])
-        compiled_results["polymer_enthalpy"].append(
-            results["polymer"][polymer_length]["enthalpy"]
-        )
-
-    compiled_results_file = os.path.join(step1_dir, f"results_{monomer_smiles}.csv")
-
-    compiled_results = pd.DataFrame(compiled_results).sort_values("polymer_length")
-    compiled_results["unit_polymer_enthalpy"] = (
-        compiled_results["polymer_enthalpy"] / compiled_results["polymer_length"]
-    )
-    compiled_results["delta_h"] = (
-        compiled_results["unit_polymer_enthalpy"] - compiled_results["monomer_enthalpy"]
+    results = dict(
+        polymer_length=[],
+        monomer_enthalpy=[],
+        initiator_enthalpy=[],
+        polymer_enthalpy=[],
     )
 
-    compiled_results.to_csv(compiled_results_file, header=True, index=False)
+    for polymer_length in data["polymer"].keys():
+        results["polymer_length"].append(int(polymer_length))
+        results["monomer_enthalpy"].append(data["monomer"]["enthalpy"])
+        results["initiator_enthalpy"].append(
+            data["initiator"]["enthalpy"] if (reaction_type == "ROR") else 0
+        )
+        results["polymer_enthalpy"].append(data["polymer"][polymer_length]["enthalpy"])
+
+    # location to save results
+    results_file = os.path.join(step1_dir, f"results_{monomer_smiles}.csv")
+
+    results = pd.DataFrame(results).sort_values("polymer_length")
+    results["unit_polymer_enthalpy"] = (
+        results["polymer_enthalpy"] / results["polymer_length"]
+    )
+    results["delta_h"] = (
+        results["unit_polymer_enthalpy"]
+        - results["monomer_enthalpy"]
+        - results["initiator_enthalpy"]
+    )
+
+    results.to_csv(results_file, header=True, index=False)
 
 
 def main(args, config, logger):
@@ -344,16 +357,19 @@ def main(args, config, logger):
         # run xtb for monomer
         monomer_n_conformers = config["monomer"]["n_conformers"]
         monomer_dir_name = os.path.join("monomer", monomer_smiles)
-
-        run_xtb_conformers(
-            smiles=monomer_smiles,
-            n_conformers=monomer_n_conformers,
-            mol_type="monomer",
-            dir_name=monomer_dir_name,
-            args=args,
-            config=config,
-            logger=logger,
-        )
+        try:
+            run_xtb_conformers(
+                smiles=monomer_smiles,
+                n_conformers=monomer_n_conformers,
+                mol_type="monomer",
+                dir_name=monomer_dir_name,
+                args=args,
+                config=config,
+                logger=logger,
+            )
+        except Exception:
+            logger.error("Failed to run xTB for monomer {monomer_smiles}")
+            continue
 
         # iterate over polymer lengths
         for polymer_length in tqdm(
@@ -369,23 +385,30 @@ def main(args, config, logger):
                     logger=logger,
                 )
             except Exception:
-                pass
-            else:
-                pass
-            if polymer_smiles is None:
-                logger.warning(
-                    f"Failed to build polymer of length {length}, moving onto next monomer"
+                logger.error(
+                    f"Failed to build polymer of length {polymer_length} for monomer {monomer_smiles}"
                 )
-                break
-            # run xtb for polymer
-            run_xtb_conformers(
-                smiles=polymer_smiles,
-                mol_type="polymer",
-                dir_name=f"{smiles}_{length}",
-                args=args,
-                config=config,
-                logger=logger,
+                continue
+            polymer_n_conformers = config["polymer"]["n_conformers"]
+            polymer_dir_name = os.path.join(
+                "polymer", f"{monomer_smiles}_{polymer_length}"
             )
+            # run xtb for polymer
+            try:
+                run_xtb_conformers(
+                    smiles=polymer_smiles,
+                    n_conformers=polymer_n_conformers,
+                    mol_type="polymer",
+                    dir_name=polymer_dir_name,
+                    args=args,
+                    config=config,
+                    logger=logger,
+                )
+            except Exception:
+                logger.error(
+                    f"Failed to run xTB for polymer of length {polymer_smiles} for monomer {monomer_smiles}"
+                )
+                continue
 
         compile_results(monomer_smiles=smiles, args=args, config=config, logger=logger)
 

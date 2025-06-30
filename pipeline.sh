@@ -1,12 +1,9 @@
-!#/usr/bin/bash
-
-# WARN: this script should be run from "larest" directory
-
-# NOTE: modifiable job sizes for HPC
-
+#!/usr/bin/bash
 #PBS -N LaREST
 #PBS -l walltime=01:00:00
-#PBS -l select=1:ncpus=16:mem=128gb
+#PBS -l select=1:ncpus=64:mem=400gb
+
+# NOTE: the above resources fall under a medium CPU PBS job
 
 # source general config file
 CONFIG_FILE="${PBS_O_WORKDIR}/config/general.conf"

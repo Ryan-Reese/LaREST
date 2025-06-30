@@ -16,7 +16,7 @@ mode = "a"
 
 [handlers.stream]
 class = "logging.StreamHandler"
-level = "DEBUG"
+level = "INFO"
 formatter = "default"
 
 [root]

@@ -258,7 +258,6 @@ def run_xtb_conformers(
 
 def compile_monomer_results(
     monomer_smiles: str,
-    reaction_type: Literal["ROR", "RER"],
     args: argparse.Namespace,
     config: dict[str, Any],
     logger: logging.Logger,
@@ -269,7 +268,7 @@ def compile_monomer_results(
     data["monomer"] = get_most_stable_conformer(monomer_dir)
 
     # get initiator results if ROR reaction
-    if reaction_type == "ROR":
+    if config["reaction"]["type"] == "ROR":
         initiator_dir = os.path.join(
             step1_dir, "initiator", config["initiator"]["smiles"]
         )
@@ -296,7 +295,9 @@ def compile_monomer_results(
         results["polymer_length"].append(int(polymer_length))
         results["monomer_enthalpy"].append(data["monomer"]["enthalpy"])
         results["initiator_enthalpy"].append(
-            data["initiator"]["enthalpy"] if (reaction_type == "ROR") else 0
+            data["initiator"]["enthalpy"]
+            if (config["reaction"]["type"] == "ROR")
+            else 0
         )
         results["polymer_enthalpy"].append(data["polymer"][polymer_length]["enthalpy"])
 
@@ -349,6 +350,7 @@ def main(args, config, logger):
             logger.info("Finished running xTB for initiator")
 
     # iterate over monomers in input list
+    logger.info("Running xTB for monomers")
     for monomer_smiles in tqdm(monomer_smiles_list, desc="Running xTB for monomers"):
         # TODO: need to decide how many conformers to generate
         # ring_size = get_ring_size(smiles)
@@ -410,7 +412,9 @@ def main(args, config, logger):
                 )
                 continue
 
-        compile_results(monomer_smiles=smiles, args=args, config=config, logger=logger)
+        compile_monomer_results(
+            monomer_smiles=monomer_smiles, args=args, config=config, logger=logger
+        )
 
 
 if __name__ == "__main__":
@@ -447,11 +451,4 @@ if __name__ == "__main__":
 
     # TODO: write assertions for config
 
-    # main(args, config, logger)
-    generate_conformer_energies(
-        config["initiator"]["smiles"],
-        config["initiator"]["n_conformers"],
-        args,
-        config,
-        logger,
-    )
+    main(args, config, logger)

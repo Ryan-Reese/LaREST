@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+import numpy as np
 import pandas as pd
 from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
 from rdkit.Chem.rdchem import BondType, EditableMol, Mol

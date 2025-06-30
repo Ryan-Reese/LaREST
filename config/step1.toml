@@ -2,8 +2,8 @@
 title = "Step 1 Config"
 
 [reaction]
-type = "RER" # ["RER", "ROR"]
-lengths = [2]
+type = "ROR" # ["RER", "ROR"]
+lengths = [2, 3]
 
 [monomer]
 n_conformers = 20

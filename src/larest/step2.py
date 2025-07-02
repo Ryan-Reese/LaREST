@@ -1,147 +1,91 @@
-import os
 import logging
 import logging.config
+import os
 import tomllib
+
 from larest.config.parsers import CRESTParser
+from larest.helpers.output import create_dir
+from larest.helpers.parsers import parse_monomer_smiles, parse_most_stable_conformer
 
 
-def find_xtb_lowest(args, config, logger):
-    """
-    Finds the most stable xyz files from xtb results and saves them in the specified output directory.
-    """
-    input_dir = os.path.join(args.output, "step1")
-    output_dir = os.path.join(args.output, "step2")
+def run_crest_conformer(smiles, mol_type, dir_name, args, config, logger):
+    # Create output dirs
+    mol_dir = os.path.join(args.output, "step2", dir_name)
+    create_dir(mol_dir, logger)
+    pre_dir = os.path.join(mol_dir, "pre")
+    create_dir(pre_dir, logger)
+    post_dir = os.path.join(mol_dir, "post")
+    create_dir(post_dir, logger)
 
-    logger.info(f"Finding the most stable conformers")
-    logger.info(f"Input dir: {input_dir}")
-    logger.info(f"Output dir: {output_dir}")
-
-    try:
-        os.mkdir(output_dir)
-        logger.info(f"Output directory {output_dir} created")
-    except FileExistsError:
-        logger.warning(f"Output directory {output_dir} already exists")
-        os.makedirs(output_dir, exist_ok=True)
-
-    found_directories = []
-    # Go through all the input directories
-    for dir_name in os.listdir(input_dir):
-        current_dir = os.path.join(input_dir, dir_name)
-        if os.path.isdir(current_dir):
-            logging.info(f"Processing directory: {current_dir}")
-            # Check if the target xyz files exist in the current directory
-            target_files = [
-                "xtbopt_low_init.xyz",
-                "xtbopt_low_lactone.xyz",
-                "xtbopt_low_polymer.xyz",
-            ]
-            files_found = [
-                f for f in target_files if os.path.isfile(os.path.join(current_dir, f))
-            ]
-
-            if len(files_found) == len(target_files):
-                found_directories.append(current_dir)
-                logging.info(f"All target files found in directory: {current_dir}")
-
-                # Extract the index, SMILES string, repeat units, and initiator from the original directory name
-                parts = dir_name.split("_")
-                index = parts[0]
-                smiles = parts[1]
-                conformers_repeatunits = "_".join(parts[2:4])
-                initiator = parts[4]  # assuming the initiator is always in the 5th part
-
-                # Create a sub-directory in the output directory with the extracted name
-                target_dir = os.path.join(
-                    output_dir, f"{index}_{smiles}_{conformers_repeatunits}_{initiator}"
-                )
-                os.makedirs(target_dir, exist_ok=True)
-
-                # Copy the target files to the target directory
-                for file_name in target_files:
-                    shutil.copy(
-                        os.path.join(current_dir, file_name),
-                        os.path.join(target_dir, file_name),
-                    )
-                    logging.info(f"Copied {file_name} to {target_dir}")
-
-    # Log the number of directories processed
-    logging.info(f"Found xyz files in {len(found_directories)} reaction directories.")
-
-    return output_dir
+    # find most stable conformer from
+    step1_mol_dir = os.path.join(args.output, "step1", "dir_name")
+    conformer_id = int(parse_most_stable_conformer(step1_mol_dir)["conformer_id"])
+    subprocess.popen()  # cp the .xyz file to step2-pre directory
 
 
-def main(args, config):
-    logging.info("Starting Step 2")
-    output_dir = find_xtb_lowest(xtb_result)
-    run_crest_on_all(output_dir, solvent, threads, rthr, ewin, ethr, opt)
+def main(args, config, logger):
+    # get input monomer SMILES strings
+    logger.info("Attempting to read input monomer smiles")
+    monomer_smiles_list = parse_monomer_smiles(args, logger)
+    logger.info("Finished reading input monomer smiles")
 
-    # Extract data from CREST outputs and compile into DataFrame
-    data = []
-    for reaction_folder in os.listdir(output_dir):
-        reaction_path = os.path.join(output_dir, reaction_folder)
+    # setup dir for step 2
+    step2_dir = os.path.join(args.output, "step2")
+    create_dir(step2_dir, logger)
 
-        if not os.path.isdir(reaction_path):
-            continue
-
-        # Process only reaction folders directly under crest_output
-        xtb_info = xtb_info_extract(reaction_folder)
-        if xtb_info is None:
-            continue
-
-        for sub_subdir in ["crest_init", "crest_lactone", "crest_polymer"]:
-            subdir_path = os.path.join(reaction_path, sub_subdir)
-            if os.path.isdir(subdir_path):
-                output_script_path = os.path.join(subdir_path, "output_script.out")
-                if os.path.exists(output_script_path):
-                    crest_info = crest_data_extract(output_script_path)
-                    data.append({**xtb_info, **crest_info, "Subfolder": subdir_path})
-
-    if not data:
-        logging.error("No valid data extracted from CREST outputs.")
-        return
-
-    df = pd.DataFrame(data)
-
-    # Run ROP calculations and generate combined output
-    combined_df = rop_calc(df)
-    combined_df.to_csv(
-        os.path.join(output_dir, "final_combined_output.csv"), index=False
-    )
-
-    logging.info("Main process completed")
-
-    # Move the crest.log file to the crest_output directory
-    log_file = "crest.log"
-    if os.path.exists(log_file):
-        shutil.move(log_file, os.path.join(output_dir, log_file))
-        logging.info(f"{log_file} has been moved to {output_dir}")
+    logger.info("Running CREST for initiator for ROR reaction")
+    if config["reaction"]["type"] == "ROR":
+        initiator_smiles = config["initiator"]["smiles"]
+        initiator_dir_name = os.path.join("initiator", initiator_smiles)
+        try:
+            run_crest_conformer(
+                smiles=initiator_smiles,
+                mol_type="initiator",
+                dir_name=initiator_dir_name,
+                args=args,
+                config=config,
+                logger=logger,
+            )
+        except Exception:
+            logger.error("Failed to run xTB for initiator")
+            raise SystemExit(1)
+        else:
+            logger.info("Finished running xTB for initiator")
 
 
 if __name__ == "__main__":
-
     # parse input arguments to get output and config dirs
     parser = CRESTParser()
     args = parser.parse_args()
 
     # load logging config from config dir
+    logging_config_file = os.path.join(args.config, "logging.toml")
     try:
-        with open(f"{args.config}/logging.toml", "rb") as fstream:
+        with open(logging_config_file, "rb") as fstream:
             log_config = tomllib.load(fstream)
-            log_config["handlers"]["file"]["filename"] = f"{args.output}/larest.log"
-    except Exception as e:
-        raise e
+    except Exception as err:
+        print(err)
+        print(f"Failed to load logging config from {logging_config_file}")
+        raise SystemExit(1)
+    else:
+        log_config["handlers"]["file"]["filename"] = f"{args.output}/larest.log"
+        logging.config.dictConfig(log_config)
+        logger = logging.getLogger("Step 2")
+        logger.info("Logging config loaded")
 
-    logging.config.dictConfig(log_config)
-    logger = logging.getLogger(__name__)
-    logger.info("logging config loaded")
+    # load step 1 config
+    step2_config_file = os.path.join(args.config, "step2.toml")
 
-    # load step 2 config or fail trying
     try:
-        with open(f"{args.config}/step2.toml", "rb") as fstream:
+        with open(step2_config_file, "rb") as fstream:
             config = tomllib.load(fstream)
-            logger.info("step 2 config loaded")
-    except Exception as e:
-        logger.exception(e)
-        raise e
+    except Exception as err:
+        logger.exception(err)
+        logger.error(f"Failed to load Step 2 config from {step2_config_file}")
+        raise SystemExit(1)
+    else:
+        logger.info("Step 2 config loaded")
+
+    # TODO: write assertions for config
 
     main(args, config, logger)

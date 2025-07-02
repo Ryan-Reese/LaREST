@@ -23,15 +23,17 @@ from rdkit.Chem.rdmolfiles import (
 from rdkit.Chem.rdmolops import AddHs
 from tqdm import tqdm
 
-from larest.config.parsers import XTBParser
-from larest.constants import KCALMOL_TO_JMOL
-from larest.helpers import (
+from larest.helpers.chem import (
     build_polymer,
-    create_dir,
-    get_most_stable_conformer,
-    get_xtb_args,
+)
+from larest.helpers.constants import KCALMOL_TO_JMOL
+from larest.helpers.output import create_dir
+from larest.helpers.parsers import (
+    XTBParser,
     parse_monomer_smiles,
-    parse_xtb,
+    parse_most_stable_conformer,
+    parse_xtb_args,
+    parse_xtb_output,
 )
 
 
@@ -196,7 +198,7 @@ def run_xtb_conformers(
             "--namespace",
             f"conformer_{cid}",
             "--json",
-        ] + get_xtb_args(config, logger)
+        ] + parse_xtb_args(config, logger)
 
         logger.debug(f"Running xTB on conformer {cid}")
         try:
@@ -232,7 +234,7 @@ def run_xtb_conformers(
         xtb_output_file = os.path.join(conformer_dir, f"{conformer_dir.name}.txt")
 
         try:
-            enthalpy, entropy, free_energy, total_energy = parse_xtb(
+            enthalpy, entropy, free_energy, total_energy = parse_xtb_output(
                 xtb_output_file, config, logger
             )
         except Exception:
@@ -265,14 +267,14 @@ def compile_monomer_results(
     data = dict(polymer=dict())
     step1_dir = os.path.join(args.output, "step1")
     monomer_dir = os.path.join(step1_dir, "monomer", monomer_smiles)
-    data["monomer"] = get_most_stable_conformer(monomer_dir)
+    data["monomer"] = parse_most_stable_conformer(monomer_dir)
 
     # get initiator results if ROR reaction
     if config["reaction"]["type"] == "ROR":
         initiator_dir = os.path.join(
             step1_dir, "initiator", config["initiator"]["smiles"]
         )
-        data["initiator"] = get_most_stable_conformer(initiator_dir)
+        data["initiator"] = parse_most_stable_conformer(initiator_dir)
 
     parent_polymer_dir = os.path.join(step1_dir, "polymer")
     with os.scandir(parent_polymer_dir) as folder:
@@ -282,7 +284,7 @@ def compile_monomer_results(
 
     for polymer_dir in polymer_dirs:
         polymer_length = polymer_dir.name.split("_")[1]
-        data["polymer"][polymer_length] = get_most_stable_conformer(polymer_dir)
+        data["polymer"][polymer_length] = parse_most_stable_conformer(polymer_dir)
 
     results = dict(
         polymer_length=[],
@@ -324,8 +326,8 @@ def main(args, config, logger):
     logger.info("Finished reading input monomer smiles")
 
     # setup output dir
-    output_dir = os.path.join(args.output, "step1")
-    create_dir(output_dir, logger)
+    step1_dir = os.path.join(args.output, "step1")
+    create_dir(step1_dir, logger)
 
     # run xtb for initiator if ROR reaction
     logger.info("Running xTB for initiator for ROR reaction")
@@ -427,9 +429,10 @@ if __name__ == "__main__":
     try:
         with open(logging_config_file, "rb") as fstream:
             log_config = tomllib.load(fstream)
-    except:
+    except Exception as err:
+        print(err)
         print(f"Failed to load logging config from {logging_config_file}")
-        raise
+        raise SystemExit(1)
     else:
         log_config["handlers"]["file"]["filename"] = f"{args.output}/larest.log"
         logging.config.dictConfig(log_config)

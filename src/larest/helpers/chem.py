@@ -1,18 +1,12 @@
-import argparse
 import logging
-import os
-from pathlib import Path
 from typing import Any, Literal
 
-import numpy as np
-import pandas as pd
-from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
 from rdkit.Chem.rdchem import BondType, EditableMol, Mol
 from rdkit.Chem.rdmolfiles import MolFromSmarts, MolFromSmiles, MolToSmiles
 from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams, molzip
 
-from larest.constants import HARTTREE_TO_JMOL, INITIATOR_GROUPS, MONOMER_GROUPS
-from larest.exceptions import PolymerLengthError, PolymerUnitError
+from larest.helpers.constants import INITIATOR_GROUPS, MONOMER_GROUPS
+from larest.helpers.exceptions import PolymerLengthError, PolymerUnitError
 
 
 def get_mol(smiles: str) -> Mol:
@@ -32,103 +26,6 @@ def get_ring_size(smiles: str) -> int | None:
     if max_ring_size == 0:
         return None
     return max_ring_size
-
-
-def create_dir(dir_path: str | Path, logger: logging.Logger) -> None:
-    # create specified dir
-    logger.debug(f"Creating directory: {dir_path}")
-
-    try:
-        os.makedirs(dir_path, exist_ok=False)
-    except FileExistsError:
-        logger.warning(f"Directory {dir_path} already exists")
-    else:
-        logger.debug(f"Directory {dir_path} created")
-
-
-def get_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
-    xtb_args = []
-    try:
-        for k, v in zip(config["xtb"].keys(), config["xtb"].values()):
-            xtb_args.append(f"--{k}")
-            xtb_args.append(str(v))
-    except Exception as err:
-        logger.exception(err)
-        logger.warning(
-            f"Failed to parse xtb arguments from dictionary {config['xtb']}, using default xtb arguments"
-        )
-        return []
-    else:
-        logger.debug(f"Returning xtb args: {xtb_args}")
-        return xtb_args
-
-
-def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> list[str]:
-    input_file = os.path.join(args.config, "input.txt")
-    logger.debug(f"Reading monomer smiles from {input_file}")
-
-    try:
-        with open(input_file, "r") as fstream:
-            monomer_smiles = fstream.read().splitlines()
-    except Exception as err:
-        logger.exception(err)
-        logger.error("Failed to read input monomer smiles")
-        raise SystemExit(1)
-    else:
-        for i, smiles in enumerate(monomer_smiles):
-            logger.debug(f"Read monomer {i}: {smiles}")
-        return monomer_smiles
-
-
-def parse_xtb(
-    xtb_output_file: str | Path, config: dict[str, Any], logger: logging.Logger
-) -> tuple[float | None, float | None, float | None, float | None]:
-    enthalpy, entropy, free_energy, total_energy = None, None, None, None
-
-    logger.debug(f"Searching for results in file {xtb_output_file}")
-    try:
-        with open(xtb_output_file, "r") as fstream:
-            for i, line in enumerate(fstream):
-                if "TOTAL ENERGY" in line:
-                    try:
-                        total_energy = float(line.split()[3]) * HARTTREE_TO_JMOL
-                    except Exception as err:
-                        logger.exception(err)
-                        logger.error(
-                            f"Failed to extract total energy from line {i}: {line}"
-                        )
-                elif "TOTAL ENTHALPY" in line:
-                    try:
-                        enthalpy = float(line.split()[3]) * HARTTREE_TO_JMOL
-                    except Exception as err:
-                        logger.exception(err)
-                        logger.error(
-                            f"Failed to extract total enthalpy from line {i}: {line}"
-                        )
-                elif "TOTAL FREE ENERGY" in line:
-                    try:
-                        free_energy = float(line.split()[4]) * HARTTREE_TO_JMOL
-                    except Exception as err:
-                        logger.exception(err)
-                        logger.error(
-                            f"Failed to extract total free energy from line {i}: {line}"
-                        )
-    except Exception as err:
-        logger.exception(err)
-        logger.error(f"Failed to parse xtb results from {xtb_output_file}")
-        raise
-    else:
-        if enthalpy and free_energy:
-            entropy = (enthalpy - free_energy) / config["xtb"]["etemp"]
-        if not (enthalpy and free_energy and total_energy):
-            logger.warning(
-                f"Failed to extract necessary data from {xtb_output_file}, missing data will be assigned None"
-            )
-        logger.debug(
-            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}"
-        )
-
-    return enthalpy, entropy, free_energy, total_energy
 
 
 def get_polymer_unit(
@@ -318,15 +215,3 @@ def build_polymer(
             f"Finished building {reaction_type} polymer: {MolToSmiles(polymer)}"
         )
     return MolToSmiles(polymer)
-
-
-def get_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:
-    results_file = os.path.join(mol_dir, "post", "results.csv")
-
-    results = pd.read_csv(
-        results_file, header=0, index_col="conformer_id", dtype=np.float64
-    )
-
-    # NOTE: The first row corresponds to the most stable conformer (lowest free energy, previously sorted)
-
-    return results.iloc[0].to_dict()

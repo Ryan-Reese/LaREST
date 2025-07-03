@@ -27,14 +27,14 @@ from larest.helpers.chem import (
     build_polymer,
 )
 from larest.helpers.constants import KCALMOL_TO_JMOL
-from larest.helpers.output import create_dir
+from larest.helpers.output import compile_monomer_results, create_dir
 from larest.helpers.parsers import (
     XTBParser,
     parse_monomer_smiles,
-    parse_most_stable_conformer,
     parse_xtb_args,
     parse_xtb_output,
 )
+from larest.helpers.setup import get_config, get_logger, setup_logging
 
 
 def generate_conformer_energies(
@@ -194,10 +194,8 @@ def run_xtb_conformers(
         xtb_args = [
             "xtb",
             f"../../pre/conformer_{cid}.xyz",
-            "--verbose",
             "--namespace",
             f"conformer_{cid}",
-            "--json",
         ] + parse_xtb_args(config, logger)
 
         logger.debug(f"Running xTB on conformer {cid}")
@@ -252,71 +250,12 @@ def run_xtb_conformers(
     results_file = os.path.join(post_dir, "results.csv")
     logger.debug(f"Writing results to {results_file}")
 
-    results = pd.DataFrame(results, dtype=np.float64).sort_values("free_energy")
+    results = pd.DataFrame(results, index=None, dtype=np.float64).sort_values(
+        "free_energy"
+    )
     results.to_csv(results_file, header=True, index=False)
 
     logger.debug(f"Finished writing results for {mol_type} ({smiles})")
-
-
-def compile_monomer_results(
-    monomer_smiles: str,
-    args: argparse.Namespace,
-    config: dict[str, Any],
-    logger: logging.Logger,
-) -> None:
-    data = dict(polymer=dict())
-    step1_dir = os.path.join(args.output, "step1")
-    monomer_dir = os.path.join(step1_dir, "monomer", monomer_smiles)
-    data["monomer"] = parse_most_stable_conformer(monomer_dir)
-
-    # get initiator results if ROR reaction
-    if config["reaction"]["type"] == "ROR":
-        initiator_dir = os.path.join(
-            step1_dir, "initiator", config["initiator"]["smiles"]
-        )
-        data["initiator"] = parse_most_stable_conformer(initiator_dir)
-
-    parent_polymer_dir = os.path.join(step1_dir, "polymer")
-    with os.scandir(parent_polymer_dir) as folder:
-        polymer_dirs = [
-            d for d in folder if (d.is_dir() and (monomer_smiles in d.name.split("_")))
-        ]
-
-    for polymer_dir in polymer_dirs:
-        polymer_length = polymer_dir.name.split("_")[1]
-        data["polymer"][polymer_length] = parse_most_stable_conformer(polymer_dir)
-
-    results = dict(
-        polymer_length=[],
-        monomer_enthalpy=[],
-        initiator_enthalpy=[],
-        polymer_enthalpy=[],
-    )
-
-    for polymer_length in data["polymer"].keys():
-        results["polymer_length"].append(int(polymer_length))
-        results["monomer_enthalpy"].append(data["monomer"]["enthalpy"])
-        results["initiator_enthalpy"].append(
-            data["initiator"]["enthalpy"]
-            if (config["reaction"]["type"] == "ROR")
-            else 0
-        )
-        results["polymer_enthalpy"].append(data["polymer"][polymer_length]["enthalpy"])
-
-    # location to save results
-    results_file = os.path.join(step1_dir, f"results_{monomer_smiles}.csv")
-
-    results = pd.DataFrame(results).sort_values("polymer_length")
-    results["unit_polymer_enthalpy"] = (
-        results["polymer_enthalpy"] / results["polymer_length"]
-    )
-    results["delta_h"] = (
-        results["unit_polymer_enthalpy"]
-        - results["monomer_enthalpy"]
-        - results["initiator_enthalpy"]
-    )
-
-    results.to_csv(results_file, header=True, index=False)
 
 
 def main(args, config, logger):
@@ -325,7 +264,7 @@ def main(args, config, logger):
     monomer_smiles_list = parse_monomer_smiles(args, logger)
     logger.info("Finished reading input monomer smiles")
 
-    # setup output dir
+    # setup step 1 dir
     step1_dir = os.path.join(args.output, "step1")
     create_dir(step1_dir, logger)
 
@@ -425,29 +364,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load logging config from config dir
-    logging_config_file = os.path.join(args.config, "logging.toml")
     try:
-        with open(logging_config_file, "rb") as fstream:
-            log_config = tomllib.load(fstream)
-    except Exception as err:
-        print(err)
-        print(f"Failed to load logging config from {logging_config_file}")
+        logger = get_logger("step1", args)
+    except Exception:
         raise SystemExit(1)
     else:
-        log_config["handlers"]["file"]["filename"] = f"{args.output}/larest.log"
-        logging.config.dictConfig(log_config)
-        logger = logging.getLogger("Step 1")
         logger.info("Logging config loaded")
 
     # load step 1 config
-    step1_config_file = os.path.join(args.config, "step1.toml")
-
     try:
-        with open(step1_config_file, "rb") as fstream:
-            config = tomllib.load(fstream)
-    except Exception as err:
-        logger.exception(err)
-        logger.error(f"Failed to load Step 1 config from {step1_config_file}")
+        config = get_config(args, logger)
+    except Exception:
         raise SystemExit(1)
     else:
         logger.info("Step 1 config loaded")

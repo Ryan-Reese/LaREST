@@ -3,9 +3,5 @@ title = "Step 2 Config"
 
 
 [crest]
-solvent = "toluene"
-threads = 16
-rthr = 0.125
-ewin = 6
-ethr = 0.05
-opt = "tight"
+T = 16
+

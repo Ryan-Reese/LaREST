@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -85,21 +85,31 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
         return monomer_smiles
 
 
-def parse_xtb_args(config: dict[str, Any], logger: logging.Logger) -> list[str]:
-    xtb_args = []
+def parse_command_args(
+    command_type: Literal["xtb", "crest"],
+    config: dict[str, Any],
+    logger: logging.Logger,
+) -> list[str]:
+    args = []
     try:
-        for k, v in zip(config["xtb"].keys(), config["xtb"].values()):
-            xtb_args.append(f"--{k}")
-            xtb_args.append(str(v))
+        for k, v in config[command_type].items():
+            if v is False:
+                continue
+            elif v is True:
+                args.append(f"--{k}")
+            else:
+                args.append(f"--{k}")
+                args.append(str(v))
+
     except Exception as err:
         logger.exception(err)
         logger.warning(
-            f"Failed to parse xtb arguments from dictionary {config['xtb']}, using default xtb arguments"
+            f"Failed to parse {command_type} arguments from dictionary {config[command_type]}, using default arguments"
         )
         return []
     else:
-        logger.debug(f"Returning xtb args: {xtb_args}")
-        return xtb_args
+        logger.debug(f"Returning {command_type} args: {args}")
+        return args
 
 
 def parse_xtb_output(
@@ -159,7 +169,5 @@ def parse_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:
     results = pd.read_csv(
         results_file, header=0, index_col=False, dtype=np.float64
     ).sort_values("free_energy", ascending=True)
-
-    # NOTE: The first row corresponds to the most stable conformer (lowest free energy, previously sorted)
 
     return results.iloc[0].to_dict()

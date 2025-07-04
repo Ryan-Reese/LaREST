@@ -80,17 +80,17 @@ def compile_monomer_results(
     results = pd.DataFrame(results, index=None, dtype=np.float64).sort_values(
         "polymer_length", ascending=True
     )
-    results["delta_h2"] = (
+    results["delta_h"] = (
         results["polymer_enthalpy"]
         - (results["polymer_length"] * results["monomer_enthalpy"])
         - results["initiator_enthalpy"]
-    )
+    ) / results["polymer_length"]
 
     results["delta_s"] = (
         results["polymer_entropy"]
         - (results["polymer_length"] * results["monomer_entropy"])
         - results["initiator_entropy"]
-    )
+    ) / results["polymer_length"]
 
     # location to save results
     results_file = os.path.join(step1_dir, f"results_{monomer_smiles}.csv")

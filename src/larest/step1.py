@@ -1,9 +1,7 @@
 import argparse
 import logging
-import logging.config
 import os
 import subprocess
-import tomllib
 from typing import Any, Literal
 
 import numpy as np
@@ -30,11 +28,11 @@ from larest.helpers.constants import KCALMOL_TO_JMOL
 from larest.helpers.output import compile_monomer_results, create_dir
 from larest.helpers.parsers import (
     XTBParser,
+    parse_command_args,
     parse_monomer_smiles,
-    parse_xtb_args,
     parse_xtb_output,
 )
-from larest.helpers.setup import get_config, get_logger, setup_logging
+from larest.helpers.setup import get_config, get_logger
 
 
 def generate_conformer_energies(
@@ -196,7 +194,7 @@ def run_xtb_conformers(
             f"../../pre/conformer_{cid}.xyz",
             "--namespace",
             f"conformer_{cid}",
-        ] + parse_xtb_args(config, logger)
+        ] + parse_command_args("xtb", config, logger)
 
         logger.debug(f"Running xTB on conformer {cid}")
         try:

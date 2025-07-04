@@ -1,7 +1,0 @@
-# Configuration Options for Step 2 (CREST)
-title = "Step 2 Config"
-
-
-[crest]
-T = 16
-

@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 #PBS -N LaREST
 #PBS -l walltime=01:00:00
-#PBS -l select=1:ncpus=64:mem=400gb
+#PBS -l select=1:ncpus=64:mem=400gb:mpiprocs=64
 
 # NOTE: the above resources fall under a medium CPU PBS job
 

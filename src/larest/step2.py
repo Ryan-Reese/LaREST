@@ -1,25 +1,26 @@
 import argparse
 import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Literal
 
-from censo.emsembleopt import Optimization, Prescreening, Refinement, Screening
-from censo.ensembledata import EnsembleData
-from censo.params import Config
-from censo.properties import NMR
-
-from larest.helpers.output import copy_most_stable_conformer, create_dir
+from larest.helpers.output import (
+    copy_most_stable_conformer,
+    create_dir,
+    slugify,
+)
 from larest.helpers.parsers import (
     CRESTParser,
     parse_command_args,
     parse_monomer_smiles,
+    parse_most_stable_conformer,
 )
 from larest.helpers.setup import get_config, get_logger
 
 
-def run_censo_conformers(
+def run_crest_thermo(
     smiles: str,
     mol_type: Literal["monomer", "initiator", "polymer"],
     dir_name: str,
@@ -27,28 +28,91 @@ def run_censo_conformers(
     config: dict[str, Any],
     logger: logging.Logger,
 ):
-    # Create output dirs
+    """
+    Running CREST to compute thermodynamic parameters of CENSO-refined conformers
+    """
+    logger.debug(f"Running CREST thermo for {mol_type} ({smiles})")
+
+    # Create output dir
+    mol_dir = os.path.join(args.output, "step2", dir_name)
+    crest_thermo_dir = os.path.join(mol_dir, "crest_thermo")
+    create_dir(crest_thermo_dir, logger)
+
+    # specify location for crest log file
+    crest_output_file = os.path.join(crest_thermo_dir, "crest.txt")
+
+    # running DFT refinement with CENSO
+    censo_config_file = os.path.join(args.config, ".censo2rc")
+
+    censo_args = [
+        "censo",
+        "--input",
+        "../crest_conf/crest_conformers.xyz",
+        "--inprc",
+        f"{os.path.abspath(censo_config_file)}",
+        "--maxcores",
+        f"{config['step2']['n_cores']}",
+    ]
+
+    try:
+        with open(censo_output_file, "w") as fstream:
+            subprocess.Popen(
+                args=censo_args,
+                stdout=fstream,
+                stderr=subprocess.STDOUT,
+                cwd=censo_dir,
+            ).wait()
+    except:
+        raise
+
+
+def run_censo(
+    smiles: str,
+    mol_type: Literal["monomer", "initiator", "polymer"],
+    dir_name: str,
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    logger: logging.Logger,
+):
+    """
+    Running CENSO to DFT refine the conformer ensemble from CREST.
+    """
+    logger.debug(f"Running the CENSO pipeline for {mol_type} ({smiles})")
+
+    # Create output dir
     mol_dir = os.path.join(args.output, "step2", dir_name)
     censo_dir = os.path.join(mol_dir, "censo")
     create_dir(censo_dir, logger)
 
-    # Obtain conformer ensemble from CREST output
-    crest_conformers_file = os.path.join(mol_dir, "crest", "crest_conformers.xyz")
-    conformer_ensemble = EnsembleData(input_file=crest_conformers_file)
+    # specify location for censo log file
+    censo_output_file = os.path.join(censo_dir, "censo.log")
 
-    # Setting config options
-    Config.NCORES = config["N_CORES"]
-    Prescreening.set_general_settings(config["censo"]["general"])
-    Prescreening.set_settings(config["censo"]["prescreening"])
-    Screening.set_settings(config["censo"]["screening"])
-    Optimization.set_settings(config["censo"]["optimization"])
-    Refinement.set_settings(config["censo"]["refinement"])
+    # running DFT refinement with CENSO
+    censo_config_file = os.path.join(args.config, ".censo2rc")
 
-    censo_pipeline = [Prescreening, Screening, Optimization, Refinement]
-    results, timings = zip(*[part.run(conformer_ensemble) for part in censo_pipeline])
+    censo_args = [
+        "censo",
+        "--input",
+        "../crest_conf/crest_conformers.xyz",
+        "--inprc",
+        f"{os.path.abspath(censo_config_file)}",
+        "--maxcores",
+        f"{config['censo']['general']['maxcores']}",
+    ]
+
+    try:
+        with open(censo_output_file, "w") as fstream:
+            subprocess.Popen(
+                args=censo_args,
+                stdout=fstream,
+                stderr=subprocess.STDOUT,
+                cwd=censo_dir,
+            ).wait()
+    except:
+        raise
 
 
-def run_crest_conformer(
+def run_crest_confgen(
     smiles: str,
     mol_type: Literal["monomer", "initiator", "polymer"],
     dir_name: str,
@@ -67,31 +131,47 @@ def run_crest_conformer(
     create_dir(mol_dir, logger)
     pre_dir = os.path.join(mol_dir, "pre")
     create_dir(pre_dir, logger)
-    crest_dir = os.path.join(mol_dir, "crest")
-    create_dir(crest_dir, logger)
+    crest_conf_dir = os.path.join(mol_dir, "crest_conf")
+    create_dir(crest_conf_dir, logger)
 
     # Copy most stable conformer from step 1
-    xyz_path = copy_most_stable_conformer(dir_name, args, logger)
-    xyz_file = Path(xyz_path).name
+    step1_mol_dir = os.path.join(args.output, "step1", dir_name)
+    conformer_id = int(parse_most_stable_conformer(step1_mol_dir)["conformer_id"])
+    conformer_xyz_file = os.path.join(
+        step1_mol_dir,
+        "post",
+        f"conformer_{conformer_id}",
+        f"conformer_{conformer_id}.xtbopt.xyz",
+    )
+    xyz_file = Path(shutil.copy2(conformer_xyz_file, pre_dir)).name
 
     # specify location for crest log file
-    crest_output_file = os.path.join(crest_dir, "crest.txt")
+    crest_output_file = os.path.join(crest_conf_dir, "crest.txt")
 
     # conformer generation with CREST
 
     crest_args = [
         "crest",
         f"../pre/{xyz_file}",
+        "--T",
+        f"{config['step2']['n_cores']}",
         "--prop",
         "hess",
         "--prop",
         "autoIR",
-    ] + parse_command_args(command_type="crest", config=config, logger=logger)
+    ] + parse_command_args(
+        command_type="crest_confgen",
+        config=config,
+        logger=logger,
+    )
 
     try:
         with open(crest_output_file, "w") as fstream:
             subprocess.Popen(
-                args=crest_args, stdout=fstream, stderr=subprocess.STDOUT, cwd=post_dir
+                args=crest_args,
+                stdout=fstream,
+                stderr=subprocess.STDOUT,
+                cwd=crest_conf_dir,
             ).wait()
     except:
         raise
@@ -110,10 +190,18 @@ def main(args, config, logger):
     # run CREST for initiator if ROR reaction
     logger.info("Running CREST for initiator for ROR reaction")
     if config["reaction"]["type"] == "ROR":
-        initiator_smiles = config["initiator"]["smiles"]
-        initiator_dir_name = os.path.join("initiator", initiator_smiles)
+        initiator_smiles = config["reaction"]["initiator"]
+        initiator_dir_name = os.path.join("initiator", slugify(initiator_smiles))
         try:
-            run_crest_conformer(
+            run_crest_confgen(
+                smiles=initiator_smiles,
+                mol_type="initiator",
+                dir_name=initiator_dir_name,
+                args=args,
+                config=config,
+                logger=logger,
+            )
+            run_censo(
                 smiles=initiator_smiles,
                 mol_type="initiator",
                 dir_name=initiator_dir_name,
@@ -127,6 +215,9 @@ def main(args, config, logger):
             raise SystemExit(1)
         else:
             logger.info("Finished running CREST for initiator")
+
+    for monomer_smiles in monomer_smiles_list:
+        pass
 
 
 if __name__ == "__main__":
@@ -142,13 +233,15 @@ if __name__ == "__main__":
     else:
         logger.info("Logging config loaded")
 
-    # load step 1 config
+    # load LaREST config
     try:
         config = get_config(args, logger)
     except Exception:
         raise SystemExit(1)
     else:
         logger.info("Step 2 config loaded")
+        logger.debug(f"Reaction config: {config['reaction']}")
+        logger.debug(f"Step 2 config: {config['step2']}")
 
     # TODO: write assertions for config
 

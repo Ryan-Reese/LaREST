@@ -30,13 +30,13 @@ def get_logger(name: str, args: argparse.Namespace) -> logging.Logger:
 
 
 def get_config(args: argparse.Namespace, logger: logging.Logger) -> dict[str, Any]:
-    config_file = os.path.join(args.config, "step1.toml")
+    config_file = os.path.join(args.config, "config.toml")
     try:
         with open(config_file, "rb") as fstream:
             config = tomllib.load(fstream)
     except Exception as err:
         logger.exception(err)
-        logger.error(f"Failed to load Step 1 config from {config_file}")
+        logger.error(f"Failed to load config from {config_file}")
         raise
     else:
         return config

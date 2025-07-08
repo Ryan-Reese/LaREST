@@ -86,13 +86,26 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
 
 
 def parse_command_args(
-    command_type: Literal["xtb", "crest"],
+    command_type: Literal[
+        "xtb",
+        "crest_confgen",
+        "crest_thermo",
+    ],
     config: dict[str, Any],
     logger: logging.Logger,
 ) -> list[str]:
+    match command_type:
+        case "xtb":
+            params = config["step1"]["xtb"]
+        case "crest_conf":
+            params = config["step2"]["crest"]["confgen"]
+        case "crest_thermo":
+            params = config["step2"]["crest"]["thermo"]
+        case _:
+            params = {}
     args = []
     try:
-        for k, v in config[command_type].items():
+        for k, v in params.items():
             if v is False:
                 continue
             elif v is True:
@@ -104,7 +117,7 @@ def parse_command_args(
     except Exception as err:
         logger.exception(err)
         logger.warning(
-            f"Failed to parse {command_type} arguments from dictionary {config[command_type]}, using default arguments"
+            f"Failed to parse {command_type} arguments from dictionary {params}, using default arguments instead"
         )
         return []
     else:
@@ -151,7 +164,7 @@ def parse_xtb_output(
         raise
     else:
         if enthalpy and free_energy:
-            entropy = (enthalpy - free_energy) / config["xtb"]["etemp"]
+            entropy = (enthalpy - free_energy) / config["step1"]["xtb"]["etemp"]
         if not (enthalpy and free_energy and total_energy):
             logger.warning(
                 f"Failed to extract necessary data from {xtb_output_file}, missing data will be assigned None"

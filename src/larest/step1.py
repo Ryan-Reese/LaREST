@@ -25,7 +25,7 @@ from larest.helpers.chem import (
     build_polymer,
 )
 from larest.helpers.constants import KCALMOL_TO_JMOL
-from larest.helpers.output import compile_monomer_results, create_dir
+from larest.helpers.output import compile_monomer_results, create_dir, slugify
 from larest.helpers.parsers import (
     XTBParser,
     parse_command_args,
@@ -52,23 +52,25 @@ def generate_conformer_energies(
     conformer_ids = EmbedMultipleConfs(
         mol,
         n_conformers,
-        randomSeed=config["rdkit"]["random_seed"],
         useRandomCoords=True,
-        boxSizeMult=config["rdkit"]["conformer_box_size"],
-        numThreads=config["rdkit"]["threads"],
+        randomSeed=config["step1"]["rdkit"]["random_seed"],
+        boxSizeMult=config["step1"]["rdkit"]["conformer_box_size"],
+        numThreads=config["step1"]["n_cores"],
     )
 
     logger.debug(f"Optimising the {n_conformers} conformers for Mol object")
     MMFFOptimizeMoleculeConfs(
         mol,
-        numThreads=config["rdkit"]["threads"],
-        maxIters=config["rdkit"]["mmff_iters"],
-        mmffVariant=config["rdkit"]["mmff"],
+        numThreads=config["step1"]["n_cores"],
+        maxIters=config["step1"]["rdkit"]["mmff_iters"],
+        mmffVariant=config["step1"]["rdkit"]["mmff"],
     )
 
     logger.debug("Computing molecular properties for MMFF")
     mp = MMFFGetMoleculeProperties(
-        mol, mmffVariant=config["rdkit"]["mmff"], mmffVerbosity=int(args.verbose)
+        mol,
+        mmffVariant=config["step1"]["rdkit"]["mmff"],
+        mmffVerbosity=int(args.verbose),
     )
 
     logger.debug(f"Computing energies for the {n_conformers} conformers")
@@ -89,7 +91,7 @@ def generate_conformer_energies(
     logger.debug(debug_view.to_string())
 
     logger.debug(f"Aligning the {n_conformers} conformers by their geometries")
-    AlignMolConformers(mol, maxIters=config["rdkit"]["align_iters"])
+    AlignMolConformers(mol, maxIters=config["step1"]["rdkit"]["align_iters"])
 
     return mol, conformer_energies
 
@@ -172,7 +174,7 @@ def run_xtb_conformers(
             MolToXYZFile(
                 mol=mol,
                 filename=xyz_file,
-                precision=config["rdkit"]["precision"],
+                precision=config["step1"]["rdkit"]["precision"],
             )
         except Exception as err:
             logger.exception(err)
@@ -194,6 +196,8 @@ def run_xtb_conformers(
             f"../../pre/conformer_{cid}.xyz",
             "--namespace",
             f"conformer_{cid}",
+            "--parallel",
+            f"{config['step1']['n_cores']}",
         ] + parse_command_args("xtb", config, logger)
 
         logger.debug(f"Running xTB on conformer {cid}")
@@ -262,16 +266,16 @@ def main(args, config, logger):
     monomer_smiles_list = parse_monomer_smiles(args, logger)
     logger.info("Finished reading input monomer smiles")
 
-    # setup step 1 dir
+    # setup step 1
     step1_dir = os.path.join(args.output, "step1")
     create_dir(step1_dir, logger)
 
     # run xtb for initiator if ROR reaction
     logger.info("Running xTB for initiator for ROR reaction")
     if config["reaction"]["type"] == "ROR":
-        initiator_smiles = config["initiator"]["smiles"]
-        initiator_n_conformers = config["initiator"]["n_conformers"]
-        initiator_dir_name = os.path.join("initiator", initiator_smiles)
+        initiator_smiles = config["reaction"]["initiator"]
+        initiator_n_conformers = config["step1"]["n_conformers"]
+        initiator_dir_name = os.path.join("initiator", slugify(initiator_smiles))
         try:
             run_xtb_conformers(
                 smiles=initiator_smiles,
@@ -296,8 +300,8 @@ def main(args, config, logger):
         # logger.debug(f"Computed ring size: {ring_size}")
 
         # run xtb for monomer
-        monomer_n_conformers = config["monomer"]["n_conformers"]
-        monomer_dir_name = os.path.join("monomer", monomer_smiles)
+        monomer_n_conformers = config["step1"]["n_conformers"]
+        monomer_dir_name = os.path.join("monomer", slugify(monomer_smiles))
         try:
             run_xtb_conformers(
                 smiles=monomer_smiles,
@@ -330,9 +334,9 @@ def main(args, config, logger):
                     f"Failed to build polymer of length {polymer_length} for monomer {monomer_smiles}"
                 )
                 continue
-            polymer_n_conformers = config["polymer"]["n_conformers"]
+            polymer_n_conformers = config["step1"]["n_conformers"]
             polymer_dir_name = os.path.join(
-                "polymer", f"{monomer_smiles}_{polymer_length}"
+                "polymer", f"{slugify(monomer_smiles)}_{polymer_length}"
             )
             # run xtb for polymer
             try:
@@ -369,13 +373,15 @@ if __name__ == "__main__":
     else:
         logger.info("Logging config loaded")
 
-    # load step 1 config
+    # load LaREST config
     try:
         config = get_config(args, logger)
     except Exception:
         raise SystemExit(1)
     else:
-        logger.info("Step 1 config loaded")
+        logger.info("LaREST config loaded")
+        logger.debug(f"Reaction config: {config['reaction']}")
+        logger.debug(f"Step 1 config: {config['step1']}")
 
     # TODO: write assertions for config
 

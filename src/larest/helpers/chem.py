@@ -128,7 +128,7 @@ def build_polymer(
     logger.debug(f"Building {reaction_type} polymer")
     if reaction_type == "ROR":
         logger.info(
-            f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['initiator']['smiles']}, length: {polymer_length}"
+            f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['reaction']['initiator']}, length: {polymer_length}"
         )
     else:
         logger.info(f"Monomer smiles: {monomer_smiles}, length: {polymer_length}")
@@ -178,7 +178,7 @@ def build_polymer(
 
     terminal_config = dict(
         ROR=dict(
-            smiles=config["initiator"]["smiles"],
+            smiles=config["reaction"]["initiator"],
             mol_type="initiator",
             front_dummy=front_dummy,
             back_dummy="Xe",

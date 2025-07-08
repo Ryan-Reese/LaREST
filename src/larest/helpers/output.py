@@ -1,7 +1,9 @@
 import argparse
 import logging
 import os
+import re
 import shutil
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -31,20 +33,22 @@ def compile_monomer_results(
 ) -> None:
     data = dict(polymer=dict())
     step1_dir = os.path.join(args.output, "step1")
-    monomer_dir = os.path.join(step1_dir, "monomer", monomer_smiles)
+    monomer_dir = os.path.join(step1_dir, "monomer", slugify(monomer_smiles))
     data["monomer"] = parse_most_stable_conformer(monomer_dir)
 
     # get initiator results if ROR reaction
     if config["reaction"]["type"] == "ROR":
         initiator_dir = os.path.join(
-            step1_dir, "initiator", config["initiator"]["smiles"]
+            step1_dir, "initiator", slugify(config["reaction"]["initiator"])
         )
         data["initiator"] = parse_most_stable_conformer(initiator_dir)
 
     parent_polymer_dir = os.path.join(step1_dir, "polymer")
     with os.scandir(parent_polymer_dir) as folder:
         polymer_dirs = [
-            d for d in folder if (d.is_dir() and (monomer_smiles in d.name.split("_")))
+            d
+            for d in folder
+            if (d.is_dir() and (slugify(monomer_smiles) in d.name.split("_")))
         ]
 
     for polymer_dir in polymer_dirs:
@@ -104,14 +108,23 @@ def get_most_stable_conformer_id(dir_name, args, logger):
     return conformer_id
 
 
-def copy_most_stable_conformer(dir_name, args, logger):
-    step1_mol_dir = os.path.join(args.output, "step1", dir_name)
-    step2_pre_dir = os.path.join(args.output, "step2", dir_name, "pre")
-    conformer_id = int(parse_most_stable_conformer(step1_mol_dir)["conformer_id"])
-    conformer_xyz_file = os.path.join(
-        step1_mol_dir,
-        "post",
-        f"conformer_{conformer_id}",
-        f"conformer_{conformer_id}.xtbopt.xyz",
+def copy_crest_conformers(dir_name, args, logger):
+    step2_mol_dir = os.path.join(args.output, "step2", dir_name)
+    crest_conformers_file = os.path.join(step2_mol_dir, "crest", "crest_conformers.xyz")
+    censo_dir = os.path.join(step2_mol_dir, "censo")
+    return shutil.copy2(crest_conformers_file, censo_dir)
+
+
+def copy_censo_config(dir_name, args, logger):
+    censo_config_file = os.path.join(args.config, ".censo2rc")
+    censo_dir = os.path.join(args.output, "step2", dir_name, "censo")
+    return shutil.copy2(censo_config_file, censo_dir)
+
+
+# taken from django.utils
+def slugify(smiles):
+    smiles = (
+        unicodedata.normalize("NFKD", smiles).encode("ascii", "ignore").decode("ascii")
     )
-    return shutil.copy2(conformer_xyz_file, step2_pre_dir)
+    smiles = re.sub(r"[^\w\s-]", "", smiles.lower())
+    return re.sub(r"[-\s]+", "-", smiles).strip("-_")

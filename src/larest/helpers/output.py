@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import re
-import shutil
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -39,7 +38,7 @@ def compile_monomer_results(
     # get initiator results if ROR reaction
     if config["reaction"]["type"] == "ROR":
         initiator_dir = os.path.join(
-            step1_dir, "initiator", slugify(config["reaction"]["initiator"])
+            step1_dir, "initiator", slugify(config["reaction"]["initiator"]),
         )
         data["initiator"] = parse_most_stable_conformer(initiator_dir)
 
@@ -71,18 +70,18 @@ def compile_monomer_results(
         results["initiator_enthalpy"].append(
             data["initiator"]["enthalpy"]
             if (config["reaction"]["type"] == "ROR")
-            else 0
+            else 0,
         )
         results["polymer_enthalpy"].append(data["polymer"][polymer_length]["enthalpy"])
 
         results["monomer_entropy"].append(data["monomer"]["entropy"])
         results["initiator_entropy"].append(
-            data["initiator"]["entropy"] if (config["reaction"]["type"] == "ROR") else 0
+            data["initiator"]["entropy"] if (config["reaction"]["type"] == "ROR") else 0,
         )
         results["polymer_entropy"].append(data["polymer"][polymer_length]["entropy"])
 
     results = pd.DataFrame(results, index=None, dtype=np.float64).sort_values(
-        "polymer_length", ascending=True
+        "polymer_length", ascending=True,
     )
     results["delta_h"] = (
         results["polymer_enthalpy"]
@@ -108,21 +107,8 @@ def get_most_stable_conformer_id(dir_name, args, logger):
     return conformer_id
 
 
-def copy_crest_conformers(dir_name, args, logger):
-    step2_mol_dir = os.path.join(args.output, "step2", dir_name)
-    crest_conformers_file = os.path.join(step2_mol_dir, "crest", "crest_conformers.xyz")
-    censo_dir = os.path.join(step2_mol_dir, "censo")
-    return shutil.copy2(crest_conformers_file, censo_dir)
-
-
-def copy_censo_config(dir_name, args, logger):
-    censo_config_file = os.path.join(args.config, ".censo2rc")
-    censo_dir = os.path.join(args.output, "step2", dir_name, "censo")
-    return shutil.copy2(censo_config_file, censo_dir)
-
-
 # taken from django.utils
-def slugify(smiles):
+def slugify(smiles: str) -> str:
     smiles = (
         unicodedata.normalize("NFKD", smiles).encode("ascii", "ignore").decode("ascii")
     )

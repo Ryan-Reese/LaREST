@@ -13,11 +13,11 @@ from larest.helpers.constants import HARTTREE_TO_JMOL
 
 
 class CRESTParser(argparse.ArgumentParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(description="Step 2 (CREST)")
         self._setup()
 
-    def _setup(self):
+    def _setup(self) -> None:
         self.add_argument(
             "-o",
             "--output",
@@ -41,11 +41,11 @@ class CRESTParser(argparse.ArgumentParser):
 
 
 class XTBParser(argparse.ArgumentParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(description="Step 1 (xTB)")
         self._setup()
 
-    def _setup(self):
+    def _setup(self) -> None:
         self.add_argument(
             "-o",
             "--output",
@@ -73,11 +73,11 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
     logger.debug(f"Reading monomer smiles from {input_file}")
 
     try:
-        with open(input_file, "r") as fstream:
+        with open(input_file) as fstream:
             monomer_smiles = fstream.read().splitlines()
     except Exception as err:
         logger.exception(err)
-        logger.error("Failed to read input monomer smiles")
+        logger.exception("Failed to read input monomer smiles")
         raise SystemExit(1)
     else:
         for i, smiles in enumerate(monomer_smiles):
@@ -108,7 +108,7 @@ def parse_command_args(
         for k, v in params.items():
             if v is False:
                 continue
-            elif v is True:
+            if v is True:
                 args.append(f"--{k}")
             else:
                 args.append(f"--{k}")
@@ -117,7 +117,7 @@ def parse_command_args(
     except Exception as err:
         logger.exception(err)
         logger.warning(
-            f"Failed to parse {command_type} arguments from dictionary {params}, using default arguments instead"
+            f"Failed to parse {command_type} arguments from dictionary {params}, using default arguments instead",
         )
         return []
     else:
@@ -126,51 +126,51 @@ def parse_command_args(
 
 
 def parse_xtb_output(
-    xtb_output_file: str | Path, config: dict[str, Any], logger: logging.Logger
+    xtb_output_file: str | Path, config: dict[str, Any], logger: logging.Logger,
 ) -> tuple[float | None, float | None, float | None, float | None]:
     enthalpy, entropy, free_energy, total_energy = None, None, None, None
 
     logger.debug(f"Searching for results in file {xtb_output_file}")
     try:
-        with open(xtb_output_file, "r") as fstream:
+        with open(xtb_output_file) as fstream:
             for i, line in enumerate(fstream):
                 if "TOTAL ENERGY" in line:
                     try:
                         total_energy = float(line.split()[3]) * HARTTREE_TO_JMOL
                     except Exception as err:
                         logger.exception(err)
-                        logger.error(
-                            f"Failed to extract total energy from line {i}: {line}"
+                        logger.exception(
+                            f"Failed to extract total energy from line {i}: {line}",
                         )
                 elif "TOTAL ENTHALPY" in line:
                     try:
                         enthalpy = float(line.split()[3]) * HARTTREE_TO_JMOL
                     except Exception as err:
                         logger.exception(err)
-                        logger.error(
-                            f"Failed to extract total enthalpy from line {i}: {line}"
+                        logger.exception(
+                            f"Failed to extract total enthalpy from line {i}: {line}",
                         )
                 elif "TOTAL FREE ENERGY" in line:
                     try:
                         free_energy = float(line.split()[4]) * HARTTREE_TO_JMOL
                     except Exception as err:
                         logger.exception(err)
-                        logger.error(
-                            f"Failed to extract total free energy from line {i}: {line}"
+                        logger.exception(
+                            f"Failed to extract total free energy from line {i}: {line}",
                         )
     except Exception as err:
         logger.exception(err)
-        logger.error(f"Failed to parse xtb results from {xtb_output_file}")
+        logger.exception(f"Failed to parse xtb results from {xtb_output_file}")
         raise
     else:
         if enthalpy and free_energy:
             entropy = (enthalpy - free_energy) / config["step1"]["xtb"]["etemp"]
         if not (enthalpy and free_energy and total_energy):
             logger.warning(
-                f"Failed to extract necessary data from {xtb_output_file}, missing data will be assigned None"
+                f"Failed to extract necessary data from {xtb_output_file}, missing data will be assigned None",
             )
         logger.debug(
-            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}"
+            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}",
         )
 
     return enthalpy, entropy, free_energy, total_energy
@@ -180,7 +180,7 @@ def parse_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:
     results_file = os.path.join(mol_dir, "post", "results.csv")
 
     results = pd.read_csv(
-        results_file, header=0, index_col=False, dtype=np.float64
+        results_file, header=0, index_col=False, dtype=np.float64,
     ).sort_values("free_energy", ascending=True)
 
     return results.iloc[0].to_dict()

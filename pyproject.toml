@@ -40,10 +40,20 @@ ignore = [
     "FIX",     # line contains fixme/todo
     "TD",      # TODOs
     "TRY003",  # long message outside exception class
+    "TRY401",  # verbose exception message
+    "G004",    # logging statement uses f-string
+    "BLE001",  # catching blind Exception
+    "D", # disable docstrings for now
+    "PLR", # disable refactor warnings
+    "PTH", # switch all paths to Pathlib objects
 ]
 pydocstyle.convention = "numpy"
 isort.known-first-party = ["src"]
 isort.split-on-trailing-comma = true
+
+[tool.ruff.lint.pycodestyle]
+# E501 reports lines that exceed the length of 100.
+max-line-length = 110
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]

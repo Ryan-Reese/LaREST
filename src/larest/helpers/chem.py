@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Literal
 
-from rdkit.Chem.rdchem import BondType, EditableMol, Mol
+from rdkit.Chem.rdchem import Atom, BondType, EditableMol, Mol, RingInfo
 from rdkit.Chem.rdmolfiles import MolFromSmarts, MolFromSmiles, MolToSmiles
 from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams, molzip
 
@@ -9,23 +9,30 @@ from larest.helpers.constants import INITIATOR_GROUPS, MONOMER_GROUPS
 from larest.helpers.exceptions import PolymerLengthError, PolymerUnitError
 
 
+# Include logger for these two functions?
 def get_mol(smiles: str) -> Mol:
     """Get an rdkit molecule object from a SMILES string."""
-    mol = MolFromSmiles(smiles)
+    mol: Mol = MolFromSmiles(smiles)
     if mol is None:
-        raise ValueError("Invalid SMILES string")
+        raise ValueError("Failed to create RDKit Mol from SMILES string")
     return mol
 
 
 def get_ring_size(smiles: str) -> int | None:
-    """Get the size of the largest ring in a molecule."""
-    mol = get_mol(smiles)
-    ring_info = mol.GetRingInfo()
-    n_atoms = mol.GetNumAtoms()
-    max_ring_size = max([ring_info.MinAtomRingSize(i) for i in range(n_atoms)])
-    if max_ring_size == 0:
-        return None
-    return max_ring_size
+    """Get the size of the functional group ring in the monomer."""
+    mol: Mol = get_mol(smiles)
+    ring_info: RingInfo = mol.GetRingInfo()
+    functional_groups: list[Mol] = [
+        MolFromSmarts(fg_smarts) for fg_smarts in MONOMER_GROUPS.values()
+    ]
+    for fg_mol in functional_groups:
+        if mol.HasSubstructMatch(fg_mol):
+            substruct_atom_idx: tuple[int] = mol.GetSubstructMatch(fg_mol)
+            for atom_id in substruct_atom_idx:
+                substruct_atom: Atom = mol.GetAtomWithIdx(atom_id)
+                if (substruct_atom.GetAtomicNum() != 6) and (substruct_atom.IsInRing()):
+                    return ring_info.MinAtomRingSize(atom_id)
+    return None
 
 
 def get_polymer_unit(
@@ -35,7 +42,8 @@ def get_polymer_unit(
     back_dummy: str,
     logger: logging.Logger,
 ) -> Mol:
-    # WARNING: does not support molecules with >1 ring-opening functional group
+    # NOTE: output for molecules with >1 ring-opening functional group
+    # is deterministic but not yet customisable
 
     if mol_type == "monomer":
         functional_groups = [MolFromSmarts(fg) for fg in MONOMER_GROUPS]
@@ -71,7 +79,7 @@ def get_polymer_unit(
     try:
         if len(fg_atom_idx) == 0:
             raise PolymerUnitError(
-                f"No functional group atom ids found for {mol_type} {smiles}"
+                f"No functional group atom ids found for {mol_type} {smiles}",
             )
     except PolymerUnitError as err:
         logger.exception(err)
@@ -98,7 +106,7 @@ def get_polymer_unit(
         )
     except Exception as err:
         logger.exception(err)
-        logger.error(f"Failed to edit {mol_type} unit {MolToSmiles(emol.GetMol())}")
+        logger.exception(f"Failed to edit {mol_type} unit {MolToSmiles(emol.GetMol())}")
         raise
     else:
         logger.debug(f"Created polymer unit {MolToSmiles(emol.GetMol())}")
@@ -115,11 +123,11 @@ def build_polymer(
     try:
         if polymer_length <= 1 and reaction_type == "RER":
             raise PolymerLengthError(
-                f"Please specify a polymer length > 1 for RER reaction (current length: {polymer_length})"
+                f"Please specify a polymer length > 1 for RER reaction (current length: {polymer_length})",
             )
-        elif polymer_length < 1 and reaction_type == "ROR":
+        if polymer_length < 1 and reaction_type == "ROR":
             raise PolymerLengthError(
-                f"Please specify a polymer length >= 1 for ROR reaction (current length: {polymer_length}"
+                f"Please specify a polymer length >= 1 for ROR reaction (current length: {polymer_length}",
             )
     except PolymerLengthError as err:
         logger.exception(err)
@@ -128,7 +136,7 @@ def build_polymer(
     logger.debug(f"Building {reaction_type} polymer")
     if reaction_type == "ROR":
         logger.info(
-            f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['reaction']['initiator']}, length: {polymer_length}"
+            f"Monomer smiles: {monomer_smiles}, initiator smiles: {config['reaction']['initiator']}, length: {polymer_length}",
         )
     else:
         logger.info(f"Monomer smiles: {monomer_smiles}, length: {polymer_length}")
@@ -145,7 +153,7 @@ def build_polymer(
             logger=logger,
         )
     except Exception:
-        logger.error(f"Failed to create monomer unit from {monomer_smiles}")
+        logger.exception(f"Failed to create monomer unit from {monomer_smiles}")
         raise
 
     monomer_units = 1
@@ -165,15 +173,15 @@ def build_polymer(
             polymer = molzip(polymer, repeating_unit, mol_zip_params)
         except Exception as err:
             logger.exception(err)
-            logger.error(
-                f"Failed to zip polymer units together: {MolToSmiles(polymer)} {MolToSmiles(repeating_unit)}"
+            logger.exception(
+                f"Failed to zip polymer units together: {MolToSmiles(polymer)} {MolToSmiles(repeating_unit)}",
             )
             raise
         else:
             front_dummy, back_dummy = back_dummy, front_dummy
             monomer_units += 1
             logger.debug(
-                f"Polymer chain with length={monomer_units}): {MolToSmiles(polymer)}"
+                f"Polymer chain with length={monomer_units}): {MolToSmiles(polymer)}",
             )
 
     terminal_config = dict(
@@ -196,8 +204,8 @@ def build_polymer(
     try:
         terminal_unit = get_polymer_unit(**terminal_config[reaction_type])
     except Exception:
-        logger.error(
-            f"Failed to create terminal group from {terminal_config[reaction_type]['smiles']}"
+        logger.exception(
+            f"Failed to create terminal group from {terminal_config[reaction_type]['smiles']}",
         )
         raise
 
@@ -206,12 +214,12 @@ def build_polymer(
         polymer = molzip(polymer, terminal_unit, mol_zip_params)
     except Exception as err:
         logger.exception(err)
-        logger.error(
-            f"Failed to zip polymer and terminal unit together: {MolToSmiles(polymer)} {MolToSmiles(terminal_unit)}"
+        logger.exception(
+            f"Failed to zip polymer and terminal unit together: {MolToSmiles(polymer)} {MolToSmiles(terminal_unit)}",
         )
         raise
     else:
         logger.info(
-            f"Finished building {reaction_type} polymer: {MolToSmiles(polymer)}"
+            f"Finished building {reaction_type} polymer: {MolToSmiles(polymer)}",
         )
     return MolToSmiles(polymer)

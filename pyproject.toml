@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "larest"
 description = "Lactone Ring-opening Energetics Sorting Tool"
 readme = "README.md"
-keywords = ["polymerisation", "xtb"]
+keywords = ["polymerisation", "xtb", "CREST", "CENSO", "DFT", "SQM"]
 license = { text = "MIT" }
 authors = [
 { name = "Ryan Reese" },
@@ -26,3 +26,33 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "EM",      # exception message must not use f-string literal
+    "ERA001",  # found commented out code
+    "FIX",     # line contains fixme/todo
+    "TD",      # TODOs
+    "TRY003",  # long message outside exception class
+]
+pydocstyle.convention = "numpy"
+isort.known-first-party = ["src"]
+isort.split-on-trailing-comma = true
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"**/tests/*" = ["ANN", "ARG001", "D", "INP001", "S101"]
+"docs/*" = ["INP001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+

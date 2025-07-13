@@ -1,13 +1,13 @@
 # Configuration Options for LaREST
 [reaction]
 type = "ROR" # ["RER", "ROR"]
-lengths = [1, 2, 3]
+lengths = [1, 2, 3, 4, 5, 6]
 initiator = "C1=CC=C(C=C1)C(=O)O"
-monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"]
+monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1", "O=C1CCCCCO1", "O=C1CCCCCCO1", "O=C1CCCCCCCO1", "O=C1CCCCCCCCO1", "O=C1CCCCCCCCCO1", "O=C1CCCCCCCCCCO1", "O=C1CCCCCCCCCCCO1", "O=C1CCCCCCCCCCCCO1", "O=C1CCCCCCCCCCCCCO1", "O=C1CCCCCCCCCCCCCCO1"]
 
 [step1]
 title = "Step 1 Config"
-n_cores = 16
+n_cores = 64
 n_conformers = 20
 
 [step1.rdkit]

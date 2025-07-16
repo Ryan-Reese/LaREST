@@ -78,7 +78,7 @@ def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> li
     except Exception as err:
         logger.exception(err)
         logger.exception("Failed to read input monomer smiles")
-        raise SystemExit(1)
+        raise SystemExit(1) from err
     else:
         for i, smiles in enumerate(monomer_smiles):
             logger.debug(f"Read monomer {i}: {smiles}")
@@ -89,7 +89,8 @@ def parse_command_args(
     command_type: Literal[
         "xtb",
         "crest_confgen",
-        "crest_thermo",
+        "xtb_thermo",
+        "confgen_xtb",
     ],
     config: dict[str, Any],
     logger: logging.Logger,
@@ -97,12 +98,13 @@ def parse_command_args(
     match command_type:
         case "xtb":
             params = config["step1"]["xtb"]
-        case "crest_conf":
+        case "crest_confgen":
             params = config["step2"]["crest"]["confgen"]
-        case "crest_thermo":
-            params = config["step2"]["crest"]["thermo"]
-        case _:
-            params = {}
+        case "xtb_thermo":
+            params = config["step2"]["xtb"]["thermo"]
+        case "confgen_xtb":
+            params = config["step2"]["confgen"]["xtb"]
+
     args = []
     try:
         for k, v in params.items():
@@ -126,7 +128,9 @@ def parse_command_args(
 
 
 def parse_xtb_output(
-    xtb_output_file: str | Path, config: dict[str, Any], logger: logging.Logger,
+    xtb_output_file: str | Path,
+    config: dict[str, Any],
+    logger: logging.Logger,
 ) -> tuple[float | None, float | None, float | None, float | None]:
     enthalpy, entropy, free_energy, total_energy = None, None, None, None
 
@@ -180,7 +184,10 @@ def parse_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:
     results_file = os.path.join(mol_dir, "post", "results.csv")
 
     results = pd.read_csv(
-        results_file, header=0, index_col=False, dtype=np.float64,
+        results_file,
+        header=0,
+        index_col=False,
+        dtype=np.float64,
     ).sort_values("free_energy", ascending=True)
 
     return results.iloc[0].to_dict()

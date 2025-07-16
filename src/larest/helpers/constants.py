@@ -11,7 +11,7 @@ MONOMER_GROUPS = {
     "tL": "[C,c;R]-[C;R](=[O;!R])-[S;R]",
     "tnL": "[C,c;R]-[C;R](=[S;!R])-[O;R]",
     "dtL": "[C,c;R]-[C;R](=[S;!R])-[S;R]",
-    "Lm": "[C,c;R]-[C;R](=[O;!R])-[N;R]",
     "oA": "[O;R]-[C;R](=[O;!R])-[N;R]",
+    "Lm": "[C,c;R]-[C;R](=[O;!R])-[N;R]",
 }
-INITIATOR_GROUPS = ["C[OH]"]
+INITIATOR_GROUPS = {"OH": "C[OH]"}

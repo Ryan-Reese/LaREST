@@ -199,7 +199,11 @@ def run_xtb_conformers(
             f"conformer_{cid}",
             "--parallel",
             f"{config['step1']['n_cores']}",
-        ] + parse_command_args("xtb", config, logger)
+        ] + parse_command_args(
+            command_type="xtb_thermo",
+            config=config,
+            logger=logger,
+        )
 
         logger.debug(f"Running xTB on conformer {cid}")
         try:
@@ -272,7 +276,7 @@ def main(
     config: dict[str, Any],
     logger: logging.Logger,
 ) -> None:
-    # setup step 1
+    # setup step 1 dir
     step1_dir = os.path.join(args.output, "step1")
     create_dir(step1_dir, logger)
 

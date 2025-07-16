@@ -1,9 +1,9 @@
 # Configuration Options for LaREST
 [reaction]
 type = "ROR" # ["RER", "ROR"]
-lengths = [1, 2, 3]
-initiator = "C1=CC=C(C=C1)C(=O)O"
-monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"]
+lengths = [1, 2, 3] # list[int]
+initiator = "C1=CC=C(C=C1)C(=O)O" # str
+monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"] # list[str]
 
 [step1]
 title = "Step 1 Config"
@@ -65,6 +65,18 @@ athr = 0.04
 nmr = true
 temp = 298.15
 
+[step2.confgen.xtb]
+verbose = true
+json = true
+hess = true
+alpb = "toluene"
+gfn = 2
+# bhess = "vtight"
+acc = 1.0
+iterations = 250
+etemp = 298.15
+sthr = 25.0
+
 [step2.xtb.thermo]
 # runtype
 # thermo = true
@@ -78,21 +90,21 @@ temp = 298.15
 # sthr = 25.0
 # ithr = -50.0
 
-verbose = true
-json = true
-hess = true
-alpb = "toluene"
-gfn = 2
-acc = 1.0
-iterations = 250
-temp = 298.15
-sthr = 25.0
+# verbose = true
+# json = true
+# alpb = "toluene"
+# gfn = 2
+# bhess = "vtight"
+# acc = 1.0
+# iterations = 250
+# etemp = 298.15
+# sthr = 25.0
 
 [step2.censo]
 
 [step2.censo.general]
 imagthr = -100.0
-sthr = 0.0
+sthr = 25.0 # changed to match paper?
 scale = 1.0
 temperature = 298.15
 solvent = "toluene"
@@ -113,7 +125,7 @@ basis = "def2-SV(P)"
 prog = "orca"
 gfnv = "gfn2"
 template = false
-run = true
+run = false
 
 [step2.censo.screening]
 threshold = 3.5
@@ -124,7 +136,7 @@ sm = "smd"
 gfnv = "gfn2"
 implicit = true
 template = false
-run = true
+run = false
 
 [step2.censo.optimization]
 macrocycles = true
@@ -152,7 +164,7 @@ sm = "smd"
 gfnv = "gfn2"
 implicit = true
 template = false
-run = true
+run = false # unnecessary?
 
 [step2.censo.nmr]
 resonance_frequency = 300.0
@@ -174,7 +186,7 @@ c_active = true
 f_active = false
 si_active = false
 p_active = false
-run = true
+run = false # unnecessary?
 
 [step2.censo.uvvis]
 prog = "orca"
@@ -184,7 +196,7 @@ sm = "smd"
 gfnv = "gfn2"
 nroots = 20
 template = false
-run = true
+run = false # unnecessary?
 
 [step2.censo.paths]
 orcaversion = "6.1.0"

@@ -1,25 +1,26 @@
+[logging]
 version = 1
 
-[formatters]
+[logging.formatters]
 
-[formatters.default]
+[logging.formatters.default]
 format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
 
-[handlers]
+[logging.handlers]
 
-[handlers.file]
+[logging.handlers.file]
 class = "logging.FileHandler"
 level = "DEBUG"
 encoding = "utf-8"
 formatter = "default"
 mode = "a"
 
-[handlers.stream]
+[logging.handlers.stream]
 class = "logging.StreamHandler"
 level = "DEBUG"
 formatter = "default"
 
-[root]
+[logging.root]
 handlers = ["file", "stream"]
 level = "DEBUG" # most of the time you're just adjusting this
 # ["DEBUG", "INFO"]

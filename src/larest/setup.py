@@ -3,44 +3,42 @@ import logging
 import logging.config
 import os
 import tomllib
+from pathlib import Path
 from typing import Any
 
 from larest.helpers.output import create_dir
 
 
-def get_logger(name: str, args: argparse.Namespace) -> logging.Logger:
-    logging_config_file = os.path.join(args.config, "logging.toml")
-    try:
-        with open(logging_config_file, "rb") as fstream:
-            log_config = tomllib.load(fstream)
-    except Exception:
-        print(f"Failed to load logging config from {logging_config_file}")
-        raise
-
-    try:
-        log_config["handlers"]["file"]["filename"] = (
-            f"{args.output}/larest.log"
-            # perhaps can change this in the future to take from the same input file
-        )
-        logging.config.dictConfig(log_config)
-    except Exception:
-        print(f"Failed to specify logging output in {log_config}")
-        raise
-
-    return logging.getLogger(name)
-
-
-def get_config(args: argparse.Namespace, logger: logging.Logger) -> dict[str, Any]:
-    config_file = os.path.join(args.config, "config.toml")
+def get_config(args: argparse.Namespace) -> dict[str, Any]:
+    config_file: Path = Path(args.config) / "config.toml"
     try:
         with open(config_file, "rb") as fstream:
             config = tomllib.load(fstream)
-    except Exception as err:
-        logger.exception(err)
-        logger.exception(f"Failed to load config from {config_file}")
+    except Exception:
+        print(f"Failed to load config from {config_file}")
         raise
     else:
         return config
+
+
+def get_logger(
+    name: str,
+    args: argparse.Namespace,
+    config: dict[str, Any],
+) -> logging.Logger:
+    logging_config_file: Path = Path(args.config) / "logging.toml"
+
+    try:
+        log_config: dict[str, Any] = config["logging"]
+        log_config["handlers"]["file"]["filename"] = (
+            Path(args.output) / log_config["handlers"]["file"]["filename"]
+        )
+        logging.config.dictConfig(log_config)
+    except Exception:
+        print(f"Failed to setup logging config from {config}")
+        raise
+
+    return logging.getLogger(name)
 
 
 def create_censorc(args: argparse.Namespace, logger: logging.Logger) -> None:

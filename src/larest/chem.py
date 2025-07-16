@@ -9,12 +9,13 @@ from larest.helpers.constants import INITIATOR_GROUPS, MONOMER_GROUPS
 from larest.helpers.exceptions import PolymerBuildError
 
 
-# Include logger for these two functions?
 def get_mol(smiles: str, logger: logging.Logger) -> Mol:
     """Get an rdkit molecule object from a SMILES string."""
     mol: Mol = MolFromSmiles(smiles)
     if mol is None:
-        raise ValueError(f"Failed to create RDKit Mol object from SMILES: {smiles}")
+        raise PolymerBuildError(
+            f"Failed to create RDKit Mol object from SMILES: {smiles}"
+        )
     logger.debug(f"Created RDKit Mol object from SMILES: {smiles}")
     return mol
 
@@ -23,7 +24,7 @@ def get_ring_size(smiles: str, logger: logging.Logger) -> int | None:
     """Get the size of the functional group ring in the monomer."""
     try:
         mol: Mol = get_mol(smiles, logger)
-    except ValueError:
+    except PolymerBuildError:
         logger.exception(f"Failed to get ring size for SMILES: {smiles}")
         raise
 
@@ -95,6 +96,8 @@ def get_polymer_unit(
                     case "initiator":
                         # break C-OH bond
                         fg_atom_idx.append(atom_id)
+                if len(fg_atom_idx) == 2:
+                    break
         if len(fg_atom_idx) != 0:
             if len(fg_atom_idx) != 2:
                 raise PolymerBuildError(

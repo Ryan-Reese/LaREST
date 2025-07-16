@@ -9,10 +9,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from larest.helpers.parsers import parse_most_stable_conformer
+from larest.parsers import parse_most_stable_conformer
 
 
-def create_dir(dir_path: str | Path, logger: logging.Logger) -> None:
+def create_dir(dir_path: Path, logger: logging.Logger) -> None:
     # create specified dir
     logger.debug(f"Creating directory: {dir_path}")
 

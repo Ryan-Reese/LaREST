@@ -39,7 +39,6 @@ monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"] # list[str]
 
 [rdkit]
 n_cores = 16
-
 n_conformers = 20
 random_seed = 42
 conformer_box_size = 2.0
@@ -49,9 +48,8 @@ mmff_iters = 200
 align_iters = 50
 
 [xtb]
-
 [xtb.rdkit]
-n_cores = 16
+parallel = 16
 etemp = 298.15
 verbose = true
 json = true

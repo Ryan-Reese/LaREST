@@ -6,7 +6,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from larest.helpers.output import create_dir
+from larest.output import create_dir
 
 
 def get_config(args: argparse.Namespace) -> dict[str, Any]:
@@ -26,13 +26,13 @@ def get_logger(
     args: argparse.Namespace,
     config: dict[str, Any],
 ) -> logging.Logger:
-    logging_config_file: Path = Path(args.config) / "logging.toml"
-
     try:
         log_config: dict[str, Any] = config["logging"]
-        log_config["handlers"]["file"]["filename"] = (
-            Path(args.output) / log_config["handlers"]["file"]["filename"]
-        )
+        # print(Path(args.output))
+        # print(log_config["handlers"]["file"]["filename"])
+        # log_config["handlers"]["file"]["filename"] = (
+        #     Path(args.output) / log_config["handlers"]["file"]["filename"]
+        # )
         logging.config.dictConfig(log_config)
     except Exception:
         print(f"Failed to setup logging config from {config}")

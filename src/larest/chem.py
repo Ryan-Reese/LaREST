@@ -5,8 +5,8 @@ from rdkit.Chem.rdchem import Atom, BondType, EditableMol, Mol, RingInfo
 from rdkit.Chem.rdmolfiles import MolFromSmarts, MolFromSmiles, MolToSmiles
 from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams, molzip
 
-from larest.helpers.constants import INITIATOR_GROUPS, MONOMER_GROUPS
-from larest.helpers.exceptions import PolymerBuildError
+from larest.constants import INITIATOR_GROUPS, MONOMER_GROUPS
+from larest.exceptions import PolymerBuildError
 
 
 def get_mol(smiles: str, logger: logging.Logger) -> Mol:

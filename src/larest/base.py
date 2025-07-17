@@ -11,7 +11,6 @@ import pandas as pd
 from rdkit.Chem.AllChem import (
     MMFFGetMoleculeForceField,
     MMFFGetMoleculeProperties,
-    MMFFMolProperties,
 )
 from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
 from rdkit.Chem.rdchem import Mol
@@ -25,15 +24,13 @@ from rdkit.Chem.rdmolfiles import (
     SDWriter,
 )
 from rdkit.Chem.rdmolops import AddHs
+from rdkit.ForceField.rdForceField import MMFFMolProperties
 from tqdm import tqdm
 
-from larest.base import LarestMol
-from larest.calculators import run_rdkit
-from larest.chem import get_mol
-from larest.helpers.chem import build_polymer, get_ring_size
-from larest.helpers.constants import KCALMOL_TO_JMOL
-from larest.helpers.output import slugify
-from larest.output import create_dir
+# from larest.calculators import run_rdkit
+from larest.chem import build_polymer, get_mol, get_ring_size
+from larest.constants import KCALMOL_TO_JMOL, XTB_OUTPUT_HEADINGS
+from larest.output import create_dir, slugify
 from larest.parsers import parse_command_args, parse_xtb_output
 from larest.setup import get_logger
 
@@ -53,6 +50,11 @@ class LarestMol(metaclass=ABCMeta):
         self.smiles = smiles
         self.args = args
         self.config = config
+        self.logger = get_logger(
+            name=self.__class__.__name__,
+            args=self.args,
+            config=self.config,
+        )
 
     @property
     def smiles(self) -> str:
@@ -72,11 +74,7 @@ class LarestMol(metaclass=ABCMeta):
 
     @property
     def logger(self) -> logging.Logger:
-        return get_logger(
-            name=self.__class__.__name__,
-            args=self.args,
-            config=self.config,
-        )
+        return self._logger
 
     @smiles.setter
     def smiles(self, smiles: str) -> None:
@@ -90,8 +88,13 @@ class LarestMol(metaclass=ABCMeta):
     def config(self, config: dict[str, Any]) -> None:
         self._config = config
 
+    @logger.setter
+    def logger(self, logger: logging.Logger) -> None:
+        self._logger = logger
+
     def run(self) -> None:
         self._run_rdkit()
+        self._run_crest()
 
     def _run_rdkit(self) -> None:
         # setup RDKit dir if not present
@@ -147,7 +150,7 @@ class LarestMol(metaclass=ABCMeta):
         )
 
         self.logger.debug(f"Aligning the {n_conformers} conformers by their geometries")
-        AlignMolConformers(mol, maxIters=self.config["step1"]["rdkit"]["align_iters"])
+        AlignMolConformers(mol, maxIters=self.config["rdkit"]["align_iters"])
 
         self.logger.debug("Finished generating conformers")
 
@@ -212,11 +215,10 @@ class LarestMol(metaclass=ABCMeta):
             # Optimisation with xTB
             xtb_args: list[str] = [
                 "xtb",
-                f"{xyz_file}",
+                f"../../../rdkit/conformer_{cid}.xyz",
+                # implement above using path
                 "--namespace",
                 f"conformer_{cid}",
-                "--parallel",
-                f"{self.config['rdkit']['n_cores']}",
             ]
             xtb_args += parse_command_args(
                 sub_config=["xtb", "rdkit"],
@@ -241,13 +243,9 @@ class LarestMol(metaclass=ABCMeta):
         self.logger.debug("Finished running xTB on conformers")
 
         self.logger.debug("Compiling results of xTB computations")
-        xtb_results = {
-            "conformer_id": [],
-            "enthalpy": [],
-            "entropy": [],
-            "free_energy": [],
-            "total_energy": [],
-        }
+
+        xtb_results: dict[str, list[float | None]] = {"conformer_id": []}
+        xtb_results |= {heading: [] for heading in XTB_OUTPUT_HEADINGS}
 
         xtb_dir: Path = mol_dir / "xtb" / "rdkit"
         conformer_dirs: list[Path] = [d for d in xtb_dir.iterdir() if d.is_dir()]
@@ -257,8 +255,9 @@ class LarestMol(metaclass=ABCMeta):
             xtb_output_file: Path = conformer_dir / f"{conformer_dir.name}.txt"
 
             try:
-                enthalpy, entropy, free_energy, total_energy = parse_xtb_output(
+                xtb_output = parse_xtb_output(
                     xtb_output_file=xtb_output_file,
+                    temperature=self.config["xtb"]["rdkit"]["etemp"],
                     config=self.config,
                     logger=self.logger,
                 )
@@ -268,22 +267,26 @@ class LarestMol(metaclass=ABCMeta):
                 )
                 continue
             else:
-                results["conformer_id"].append(conformer_dir.name.split("_")[1])
-                results["enthalpy"].append(enthalpy)
-                results["entropy"].append(entropy)
-                results["free_energy"].append(free_energy)
-                results["total_energy"].append(total_energy)
+                xtb_results["conformer_id"].append(
+                    int(conformer_dir.name.split("_")[1]),
+                )
+                for heading in XTB_OUTPUT_HEADINGS:
+                    xtb_results[heading].append(xtb_output[heading])
 
-        results_file = os.path.join(post_dir, "results.csv")
-        logger.debug(f"Writing results to {results_file}")
+        xtb_results_file = xtb_dir / "results.csv"
+        self.logger.debug(f"Writing results to {xtb_results_file}")
 
-        results = pd.DataFrame(results, index=None, dtype=np.float64).sort_values(
+        results = pd.DataFrame(xtb_results, dtype=np.float64).sort_values(
             "free_energy",
         )
-        results.to_csv(results_file, header=True, index=False)
+        results.to_csv(xtb_results_file, header=True, index=False)
 
-        logger.debug(f"Finished writing results for {mol_type} ({smiles})")
-        return None
+        self.logger.debug(
+            f"Finished writing results for {self.__class__.__name__} ({self.smiles})",
+        )
+
+    def _run_crest(self):
+        pass
 
 
 class Initiator(LarestMol):
@@ -363,11 +366,5 @@ class Monomer(LarestMol):
             for length in self.config["reaction"]["lengths"]
         ]
 
-        # Create output dirs
-        # create_dir(mol_dir, logger)
-        # pre_dir = os.path.join(mol_dir, "pre")
-        # create_dir(pre_dir, logger)
-        # post_dir = os.path.join(mol_dir, "post")
-        # create_dir(post_dir, logger)
-
-        # Generate and write conformers in .sdf files
+    def _compile_monomer_results(self):
+        pass

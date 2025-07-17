@@ -2,12 +2,12 @@ import argparse
 import logging
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from larest.helpers.constants import HARTTREE_TO_JMOL
+from larest.constants import HARTTREE_TO_JMOL, XTB_OUTPUT_HEADINGS
 
 # TODO: this needs to have a new file name/location
 
@@ -40,21 +40,21 @@ class LarestArgumentParser(argparse.ArgumentParser):
         )
 
 
-def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> list[str]:
-    input_file = os.path.join(args.config, "input.txt")
-    logger.debug(f"Reading monomer smiles from {input_file}")
-
-    try:
-        with open(input_file) as fstream:
-            monomer_smiles = fstream.read().splitlines()
-    except Exception as err:
-        logger.exception(err)
-        logger.exception("Failed to read input monomer smiles")
-        raise SystemExit(1) from err
-    else:
-        for i, smiles in enumerate(monomer_smiles):
-            logger.debug(f"Read monomer {i}: {smiles}")
-        return monomer_smiles
+# def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> list[str]:
+#     input_file = os.path.join(args.config, "input.txt")
+#     logger.debug(f"Reading monomer smiles from {input_file}")
+#
+#     try:
+#         with open(input_file) as fstream:
+#             monomer_smiles = fstream.read().splitlines()
+#     except Exception as err:
+#         logger.exception(err)
+#         logger.exception("Failed to read input monomer smiles")
+#         raise SystemExit(1) from err
+#     else:
+#         for i, smiles in enumerate(monomer_smiles):
+#             logger.debug(f"Read monomer {i}: {smiles}")
+# return monomer_smiles
 
 
 def parse_command_args(
@@ -86,10 +86,11 @@ def parse_command_args(
 
 def parse_xtb_output(
     xtb_output_file: Path,
+    temperature: float,
     config: dict[str, Any],
     logger: logging.Logger,
-) -> tuple[float | None, float | None, float | None, float | None]:
-    enthalpy, entropy, free_energy, total_energy = None, None, None, None
+) -> dict[str, float | None]:
+    xtb_output: dict[str, float | None] = dict.fromkeys(XTB_OUTPUT_HEADINGS, None)
 
     logger.debug(f"Searching for results in file {xtb_output_file}")
     try:
@@ -97,7 +98,9 @@ def parse_xtb_output(
             for i, line in enumerate(fstream):
                 if "TOTAL ENERGY" in line:
                     try:
-                        total_energy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                        xtb_output["total_energy"] = (
+                            float(line.split()[3]) * HARTTREE_TO_JMOL
+                        )
                     except Exception as err:
                         logger.exception(err)
                         logger.exception(
@@ -105,7 +108,9 @@ def parse_xtb_output(
                         )
                 elif "TOTAL ENTHALPY" in line:
                     try:
-                        enthalpy = float(line.split()[3]) * HARTTREE_TO_JMOL
+                        xtb_output["enthalpy"] = (
+                            float(line.split()[3]) * HARTTREE_TO_JMOL
+                        )
                     except Exception as err:
                         logger.exception(err)
                         logger.exception(
@@ -113,7 +118,9 @@ def parse_xtb_output(
                         )
                 elif "TOTAL FREE ENERGY" in line:
                     try:
-                        free_energy = float(line.split()[4]) * HARTTREE_TO_JMOL
+                        xtb_output["free_energy"] = (
+                            float(line.split()[4]) * HARTTREE_TO_JMOL
+                        )
                     except Exception as err:
                         logger.exception(err)
                         logger.exception(
@@ -124,17 +131,21 @@ def parse_xtb_output(
         logger.exception(f"Failed to parse xtb results from {xtb_output_file}")
         raise
     else:
-        if enthalpy and free_energy:
-            entropy = (enthalpy - free_energy) / config["xtb"]["etemp"]
-        if not (enthalpy and free_energy and total_energy):
-            logger.warning(
-                f"Failed to extract necessary data from {xtb_output_file}, missing data will be assigned None",
-            )
+        if xtb_output["enthalpy"] and xtb_output["free_energy"]:
+            xtb_output["entropy"] = (
+                xtb_output["enthalpy"] - xtb_output["free_energy"]
+            ) / temperature
+        if not all(xtb_output.values()):
+            logger.warning(f"Failed to extract necessary data from {xtb_output_file}")
+            logger.warning("Missing data will be assigned None")
         logger.debug(
-            f"Found enthalpy: {enthalpy}, entropy: {entropy}, free_energy: {free_energy}, total energy: {total_energy}",
+            f"Found enthalpy: {xtb_output['enthalpy']}, entropy: {xtb_output['entropy']}",
+        )
+        logger.debug(
+            f"Free energy {xtb_output['free_energy']}, total energy {xtb_output['total_energy']}",
         )
 
-    return enthalpy, entropy, free_energy, total_energy
+        return xtb_output
 
 
 def parse_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:

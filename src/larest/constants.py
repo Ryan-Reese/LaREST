@@ -1,6 +1,6 @@
 HARTTREE_TO_JMOL = 2625499.63948
 KCALMOL_TO_JMOL = 4184.0
-MONOMER_GROUPS = {
+MONOMER_GROUPS: dict[str, str] = {
     "CC": "[O;R]-[C;R](=[O;!R])-[O;R]",
     "CtC": "[O;R]-[C;R](=[O;!R])-[S;R]",
     "CdtC": "[S;R]-[C;R](=[O;!R])-[S;R]",
@@ -14,4 +14,10 @@ MONOMER_GROUPS = {
     "oA": "[O;R]-[C;R](=[O;!R])-[N;R]",
     "Lm": "[C,c;R]-[C;R](=[O;!R])-[N;R]",
 }
-INITIATOR_GROUPS = {"OH": "C[OH]"}
+INITIATOR_GROUPS: dict[str, str] = {"OH": "C[OH]"}
+XTB_OUTPUT_HEADINGS: list[str] = [
+    "enthalpy",
+    "entropy",
+    "free_energy",
+    "total_energy",
+]

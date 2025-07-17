@@ -1,8 +1,9 @@
 import argparse
+import asyncio
 import logging
 from typing import Any
 
-from larest.base import Initiator
+from larest.base import Initiator, Monomer, Polymer
 from larest.parsers import LarestArgumentParser
 from larest.setup import get_config, get_logger
 
@@ -22,16 +23,6 @@ def main(
         )
         try:
             initiator.run()
-        try:
-            run_xtb_conformers(
-                smiles=initiator_smiles,
-                n_conformers=initiator_n_conformers,
-                mol_type="initiator",
-                dir_name=initiator_dir_name,
-                args=args,
-                config=config,
-                logger=logger,
-            )
         except Exception as err:
             logger.exception("Failed to run xTB for initiator")
             raise SystemExit(1) from err

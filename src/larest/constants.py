@@ -21,3 +21,9 @@ XTB_OUTPUT_HEADINGS: list[str] = [
     "free_energy",
     "total_energy",
 ]
+CENSO_HEADINGS: list[str] = [
+    "0_PRESCREENING",
+    "1_SCREENING",
+    "2_OPTIMIZATION",
+    "3_REFINEMENT",
+]

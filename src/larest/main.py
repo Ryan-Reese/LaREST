@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import logging
 from typing import Any
 
@@ -52,22 +51,15 @@ def main(
             logger.info("Finished running pipeline for monomer")
 
         # run pipeline for each polymer length
-        for polymer_length in tqdm(
-            config["reaction"]["lengths"],
+        for polymer in tqdm(
+            monomer.polymers,
             desc="Running pipeline for each polymer length",
         ):
-            # build polymer
-            polymer: Polymer = Polymer(
-                smiles=monomer_smiles,
-                length=polymer_length,
-                args=args,
-                config=config,
-            )
             try:
                 polymer.run()
             except Exception:
                 logger.exception(
-                    f"Failed to run pipeline for polymer {monomer_smiles} (length: {polymer_length})",
+                    f"Failed to run pipeline for polymer {monomer_smiles} (length: {polymer.length})",
                 )
                 continue
             else:

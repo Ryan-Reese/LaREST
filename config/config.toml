@@ -29,17 +29,26 @@ formatter = "default"
 handlers = ["file", "stream"]
 level = "DEBUG" # [DEBUG, INFO]
 
+# STEPS -------------
+
+[steps]
+rdkit = true
+crest = true
+censo = true
+xtb = true
+orca = true
+
 # REACTION -------------
 
 [reaction]
-type = "ROR" # ["RER", "ROR"]
+type = "RER" # ["RER", "ROR"]
 lengths = [1, 2, 3] # list[int]
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
 monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"] # list[str]
 
 [rdkit]
 n_cores = 16
-n_conformers = 20
+n_conformers = 20 # TODO: need to decide on initial conformer no.
 random_seed = 42
 conformer_box_size = 2.0
 precision = 6
@@ -69,8 +78,21 @@ verbose = true
 json = true
 alpb = "toluene"
 gfn = 2
-acc = 1.0
-iterations = 250
+acc = 0.5
+iterations = 500
+
+[xtb.censo]
+parallel = 16
+bhess = "vtight"
+# hess = true
+# ohess = "vtight"
+etemp = 298.15
+verbose = true
+json = true
+alpb = "toluene"
+gfn = 2
+acc = 0.25
+iterations = 1000
 
 # ----------------------
 
@@ -105,44 +127,21 @@ athr = 0.04
 nmr = true
 temp = 298.15
 
-[step2.confgen.xtb]
-verbose = true
-json = true
-hess = true
-alpb = "toluene"
-gfn = 2
-# bhess = "vtight"
-acc = 1.0
-iterations = 250
-etemp = 298.15
-sthr = 25.0
+[crest.entropy]
 
-[step2.xtb.thermo]
-# runtype
-# thermo = true
-# legacy = true
-# level of theory
-# gfn2 = true
-# alpb = "toluene"
 # entropy mode settings
 # ptot = 0.9
 # fscal = 1.0
 # sthr = 25.0
 # ithr = -50.0
 
-# verbose = true
-# json = true
-# alpb = "toluene"
-# gfn = 2
-# bhess = "vtight"
-# acc = 1.0
-# iterations = 250
-# etemp = 298.15
-# sthr = 25.0
 
-[step2.censo]
+[censo]
 
-[step2.censo.general]
+[censo.cli]
+maxcores = 8
+
+[censo.general]
 imagthr = -100.0
 sthr = 25.0 # changed to match paper?
 scale = 1.0
@@ -158,17 +157,18 @@ gas-phase = false
 copy_mo = true
 retry_failed = true
 
-[step2.censo.prescreening]
+[censo.prescreening]
+run = true
 threshold = 4.0
 func = "pbe-d4"
 basis = "def2-SV(P)"
 prog = "orca"
 gfnv = "gfn2"
 template = false
-run = false
 
-[step2.censo.screening]
-threshold = 3.5
+[censo.screening]
+run = false
+threshold = 0.1 # changed
 func = "r2scan-3c"
 basis = "def2-TZVP"
 prog = "orca"
@@ -176,27 +176,27 @@ sm = "smd"
 gfnv = "gfn2"
 implicit = true
 template = false
-run = false
 
-[step2.censo.optimization]
+[censo.optimization]
+run = false
+threshold = 0.1
 macrocycles = true
 optcycles = 8
 maxcyc = 200
-threshold = 3.0
 hlow = 0.01
 gradthr = 0.01
 func = "r2scan-3c"
 basis = "def2-TZVP"
 prog = "orca"
 sm = "smd"
+xtb_opt = true
 gfnv = "gfn2"
 optlevel = "normal"
 template = false
-xtb_opt = true
-run = true
 
-[step2.censo.refinement]
-threshold = 0.95
+[censo.refinement]
+run = false
+threshold = 0.1
 func = "wb97x-v"
 basis = "def2-TZVP"
 prog = "orca"
@@ -204,9 +204,8 @@ sm = "smd"
 gfnv = "gfn2"
 implicit = true
 template = false
-run = false # unnecessary?
 
-[step2.censo.nmr]
+[censo.nmr]
 resonance_frequency = 300.0
 ss_cutoff = 8.0
 prog = "orca"
@@ -228,7 +227,7 @@ si_active = false
 p_active = false
 run = false # unnecessary?
 
-[step2.censo.uvvis]
+[censo.uvvis]
 prog = "orca"
 func = "wb97x-d4"
 basis = "def2-TZVP"
@@ -238,5 +237,5 @@ nroots = 20
 template = false
 run = false # unnecessary?
 
-[step2.censo.paths]
-orcaversion = "6.1.0"
+[censo.paths]
+orcaversion = "6.1.0" # replace as necessary

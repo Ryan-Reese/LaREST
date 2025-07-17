@@ -50,10 +50,23 @@ align_iters = 50
 [xtb]
 [xtb.rdkit]
 parallel = 16
+ohess = "vtight"
 etemp = 298.15
 verbose = true
 json = true
-ohess = "vtight"
+alpb = "toluene"
+gfn = 2
+acc = 1.0
+iterations = 250
+
+[xtb.crest]
+parallel = 16
+hess = true
+# ohess = "vtight"
+# bhess = "vtight"
+etemp = 298.15
+verbose = true
+json = true
 alpb = "toluene"
 gfn = 2
 acc = 1.0
@@ -61,14 +74,10 @@ iterations = 250
 
 # ----------------------
 
-[step2]
-title = "Step 2 Config"
-n_cores = 8
-
-[step2.crest]
-
-[step2.crest.confgen]
+[crest]
+[crest.confgen]
 # general
+T = 16
 niceprint = true
 # runtype
 v3 = true

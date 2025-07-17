@@ -148,14 +148,14 @@ def parse_xtb_output(
         return xtb_output
 
 
-def parse_most_stable_conformer(mol_dir: str | os.DirEntry) -> dict[str, float]:
-    results_file = os.path.join(mol_dir, "post", "results.csv")
+def parse_best_rdkit_conformer(xtb_rdkit_dir: Path) -> dict[str, float | None]:
+    xtb_results_file: Path = xtb_rdkit_dir / "results.csv"
 
-    results = pd.read_csv(
-        results_file,
+    xtb_results_df: pd.DataFrame = pd.read_csv(
+        xtb_results_file,
         header=0,
         index_col=False,
         dtype=np.float64,
     ).sort_values("free_energy", ascending=True)
 
-    return results.iloc[0].to_dict()
+    return xtb_results_df.iloc[0].to_dict()

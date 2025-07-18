@@ -9,10 +9,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from larest.helpers.parsers import parse_most_stable_conformer
 
-
-def create_dir(dir_path: str | Path, logger: logging.Logger) -> None:
+def create_dir(dir_path: Path, logger: logging.Logger) -> None:
     # create specified dir
     logger.debug(f"Creating directory: {dir_path}")
 
@@ -38,7 +36,9 @@ def compile_monomer_results(
     # get initiator results if ROR reaction
     if config["reaction"]["type"] == "ROR":
         initiator_dir = os.path.join(
-            step1_dir, "initiator", slugify(config["reaction"]["initiator"]),
+            step1_dir,
+            "initiator",
+            slugify(config["reaction"]["initiator"]),
         )
         data["initiator"] = parse_most_stable_conformer(initiator_dir)
 
@@ -76,12 +76,15 @@ def compile_monomer_results(
 
         results["monomer_entropy"].append(data["monomer"]["entropy"])
         results["initiator_entropy"].append(
-            data["initiator"]["entropy"] if (config["reaction"]["type"] == "ROR") else 0,
+            data["initiator"]["entropy"]
+            if (config["reaction"]["type"] == "ROR")
+            else 0,
         )
         results["polymer_entropy"].append(data["polymer"][polymer_length]["entropy"])
 
     results = pd.DataFrame(results, index=None, dtype=np.float64).sort_values(
-        "polymer_length", ascending=True,
+        "polymer_length",
+        ascending=True,
     )
     results["delta_h"] = (
         results["polymer_enthalpy"]
@@ -96,7 +99,7 @@ def compile_monomer_results(
     ) / results["polymer_length"]
 
     # location to save results
-    results_file = os.path.join(step1_dir, f"results_{monomer_smiles}.csv")
+    results_file = os.path.join(step1_dir, f"results_{slugify(monomer_smiles)}.csv")
 
     results.to_csv(results_file, header=True, index=False)
 

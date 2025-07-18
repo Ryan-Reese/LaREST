@@ -1,9 +1,7 @@
 import argparse
 import logging
-import os
-import subprocess
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -20,37 +18,34 @@ from rdkit.Chem.rdmolfiles import (
     SDWriter,
 )
 from rdkit.Chem.rdmolops import AddHs
-from tqdm import tqdm
 
-from larest.helpers.chem import (
-    build_polymer,
-)
-from larest.helpers.constants import KCALMOL_TO_JMOL
-from larest.helpers.output import compile_monomer_results, create_dir, slugify
-from larest.helpers.parsers import (
-    XTBParser,
-    parse_command_args,
-    parse_xtb_output,
-)
-from larest.helpers.setup import get_config, get_logger
+from larest.base import LarestMol
+from larest.chem import get_mol
+from larest.output import create_dir
 
 
-def generate_conformer_energies(
-    smiles: str,
-    n_conformers: int,
+def run_rdkit(
+    mol: LarestMol,
     args: argparse.Namespace,
     config: dict[str, Any],
     logger: logging.Logger,
-) -> tuple[Mol, list[tuple[int, float]]]:
+) -> None:
+    # setup RDKit dir if not present
+    rdkit_dir = Path(args.output) / mol.dirname / "rdkit"
+    create_dir(rdkit_dir, logger)
+
+    logger.debug(
+        "Generating conformers and computing energies using RDKit",
+    )
+    # ) -> tuple[Mol, list[tuple[int, float]]]:
     """
     Generates conformers from a given SMILES string using RDKit
     """
-    logger.debug(f"Generating RDKit Mol object from SMILES ({smiles})")
-    mol = AddHs(MolFromSmiles(smiles), addCoords=True)
+    rdkit_mol = AddHs(get_mol(mol.smiles, logger))
 
-    logger.debug(f"Generating {n_conformers} conformers for Mol object")
+    logger.debug(f"Generating {n_conformers} conformers for rdkit_mol object")
     conformer_ids = EmbedMultipleConfs(
-        mol,
+        rdkit_mol,
         n_conformers,
         useRandomCoords=True,
         randomSeed=config["step1"]["rdkit"]["random_seed"],
@@ -58,17 +53,17 @@ def generate_conformer_energies(
         numThreads=config["step1"]["n_cores"],
     )
 
-    logger.debug(f"Optimising the {n_conformers} conformers for Mol object")
-    MMFFOptimizeMoleculeConfs(
-        mol,
+    logger.debug(f"Optimising the {n_conformers} conformers for rdkit_mol object")
+    MMFFOptimizerdkit_moleculeConfs(
+        rdkit_mol,
         numThreads=config["step1"]["n_cores"],
         maxIters=config["step1"]["rdkit"]["mmff_iters"],
         mmffVariant=config["step1"]["rdkit"]["mmff"],
     )
 
-    logger.debug("Computing molecular properties for MMFF")
-    mp = MMFFGetMoleculeProperties(
-        mol,
+    logger.debug("Computing rdkit_molecular properties for MMFF")
+    mp = MMFFGetrdkit_moleculeProperties(
+        rdkit_mol,
         mmffVariant=config["step1"]["rdkit"]["mmff"],
         mmffVerbosity=int(args.verbose),
     )
@@ -78,8 +73,8 @@ def generate_conformer_energies(
         [
             (
                 cid,
-                MMFFGetMoleculeForceField(mol, mp, confId=cid).CalcEnergy()
-                * KCALMOL_TO_JMOL,
+                MMFFGetrdkit_moleculeForceField(mol, mp, confId=cid).CalcEnergy()
+                * KCALrdkit_mol_TO_JMOL,
             )
             for cid in conformer_ids
         ],
@@ -91,38 +86,18 @@ def generate_conformer_energies(
     logger.debug(debug_view.to_string())
 
     logger.debug(f"Aligning the {n_conformers} conformers by their geometries")
-    AlignMolConformers(mol, maxIters=config["step1"]["rdkit"]["align_iters"])
+    Alignrdkit_molConformers(mol, maxIters=config["step1"]["rdkit"]["align_iters"])
 
-    return mol, conformer_energies
-
-
-def run_xtb_conformers(
-    smiles: str,
-    n_conformers: int,
-    mol_type: Literal["monomer", "initiator", "polymer"],
-    dir_name: str,
-    args: argparse.Namespace,
-    config: dict[str, Any],
-    logger: logging.Logger,
-) -> None:
-    """
-    Calculates the thermodynamic parameters of the molecule with the specified SMILES string
-    """
-
-    logger.debug(
-        f"Genering conformers and computing their energies of {mol_type} ({smiles}) using RDKit",
-    )
+    return rdkit_mol, conformer_energies
 
     # Create output dirs
-    mol_dir = os.path.join(args.output, "step1", dir_name)
-    create_dir(mol_dir, logger)
-    pre_dir = os.path.join(mol_dir, "pre")
-    create_dir(pre_dir, logger)
-    post_dir = os.path.join(mol_dir, "post")
-    create_dir(post_dir, logger)
+    # create_dir(mol_dir, logger)
+    # pre_dir = os.path.join(mol_dir, "pre")
+    # create_dir(pre_dir, logger)
+    # post_dir = os.path.join(mol_dir, "post")
+    # create_dir(post_dir, logger)
 
     # Generate and write conformers in .sdf files
-    logger.debug("Generating conformers and their energies using RDKit")
     mol, conformer_energies = generate_conformer_energies(
         smiles=StandardizeSmiles(smiles),  # USES CANONICAL SMILES
         n_conformers=n_conformers,
@@ -270,136 +245,3 @@ def run_xtb_conformers(
     results.to_csv(results_file, header=True, index=False)
 
     logger.debug(f"Finished writing results for {mol_type} ({smiles})")
-
-
-def main(
-    args: argparse.Namespace,
-    config: dict[str, Any],
-    logger: logging.Logger,
-) -> None:
-    # setup RDKit dir
-    rdkit_dir = Path(args.output) / "rdkit"
-    create_dir(rdkit_dir, logger)
-
-    # run pipeline for initiator if ROR reaction
-    if config["reaction"]["type"] == "ROR":
-        logger.info("ROR Reaction detected, running pipeline for initiator")
-        initiator_smiles = config["reaction"]["initiator"]
-        initiator_n_conformers = config["step1"]["n_conformers"]
-        initiator_dir_name = os.path.join("initiator", slugify(initiator_smiles))
-        try:
-            run_xtb_conformers(
-                smiles=initiator_smiles,
-                n_conformers=initiator_n_conformers,
-                mol_type="initiator",
-                dir_name=initiator_dir_name,
-                args=args,
-                config=config,
-                logger=logger,
-            )
-        except Exception as err:
-            logger.exception("Failed to run xTB for initiator")
-            raise SystemExit(1) from err
-        else:
-            logger.info("Finished running xTB for initiator")
-
-    # iterate over monomers in input list
-    logger.info("Running xTB for monomers")
-    for monomer_smiles in tqdm(
-        config["reaction"]["monomers"],
-        desc="Running xTB for monomers",
-    ):
-        # TODO: need to decide how many conformers to generate
-
-        # run xtb for monomer
-        monomer_n_conformers = config["step1"]["n_conformers"]
-        monomer_dir_name = os.path.join("monomer", slugify(monomer_smiles))
-        try:
-            run_xtb_conformers(
-                smiles=monomer_smiles,
-                n_conformers=monomer_n_conformers,
-                mol_type="monomer",
-                dir_name=monomer_dir_name,
-                args=args,
-                config=config,
-                logger=logger,
-            )
-        except Exception:
-            logger.exception(f"Failed to run xTB for monomer {monomer_smiles}")
-            continue
-
-        # iterate over polymer lengths
-        for polymer_length in tqdm(
-            config["reaction"]["lengths"],
-            desc="Running xTB for each polymer length",
-        ):
-            # build polymer
-            try:
-                polymer_smiles = build_polymer(
-                    monomer_smiles=monomer_smiles,
-                    polymer_length=polymer_length,
-                    reaction_type=config["reaction"]["type"],
-                    config=config,
-                    logger=logger,
-                )
-            except Exception:
-                logger.exception(
-                    f"Failed to build polymer of length {polymer_length} for monomer {monomer_smiles}",
-                )
-                continue
-            polymer_n_conformers = config["step1"]["n_conformers"]
-            polymer_dir_name = os.path.join(
-                "polymer",
-                f"{slugify(monomer_smiles)}_{polymer_length}",
-            )
-            # run xtb for polymer
-            try:
-                run_xtb_conformers(
-                    smiles=polymer_smiles,
-                    n_conformers=polymer_n_conformers,
-                    mol_type="polymer",
-                    dir_name=polymer_dir_name,
-                    args=args,
-                    config=config,
-                    logger=logger,
-                )
-            except Exception:
-                logger.exception(
-                    f"Failed to run xTB for polymer of length {polymer_smiles} for monomer {monomer_smiles}",
-                )
-                continue
-
-        compile_monomer_results(
-            monomer_smiles=monomer_smiles,
-            args=args,
-            config=config,
-            logger=logger,
-        )
-
-
-if __name__ == "__main__":
-    # parse input arguments to get output and config dirs
-    parser = XTBParser()
-    args = parser.parse_args()
-
-    # load logging config from config dir
-    try:
-        logger = get_logger("step1", args)
-    except Exception as err:
-        raise SystemExit(1) from err
-    else:
-        logger.info("Logging config loaded")
-
-    # load LaREST config
-    try:
-        config = get_config(args, logger)
-    except Exception as err:
-        raise SystemExit(1) from err
-    else:
-        logger.info("LaREST config loaded")
-        logger.debug(f"Reaction config: {config['reaction']}")
-        logger.debug(f"Step 1 config: {config['step1']}")
-
-    # TODO: write assertions for config
-
-    main(args, config, logger)

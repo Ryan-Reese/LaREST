@@ -1,16 +1,59 @@
 # Configuration Options for LaREST
+
+# LOGGING -----------
+
+[logging]
+version = 1
+
+[logging.formatters]
+
+[logging.formatters.default]
+format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
+
+[logging.handlers]
+
+[logging.handlers.file]
+class = "logging.FileHandler"
+level = "DEBUG"
+encoding = "utf-8"
+filename = "larest.log"
+formatter = "default"
+mode = "a"
+
+[logging.handlers.stream]
+class = "logging.StreamHandler"
+level = "DEBUG"
+formatter = "default"
+
+[logging.root]
+handlers = ["file", "stream"]
+level = "DEBUG" # [DEBUG, INFO]
+
+# STEPS -------------
+
+[steps]
+rdkit = true
+crest_confgen = true
+censo = true
+crest_entropy = true
+xtb = true
+orca = true
+
+# REACTION -------------
+
 [reaction]
 type = "ROR" # ["RER", "ROR"]
-lengths = [1, 2, 3]
-initiator = "C1=CC=C(C=C1)C(=O)O"
-monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"]
+lengths = [1]
+# lengths = [1, 2, 3] # list[int]
+initiator = "C1=CC=C(C=C1)C(=O)O" # str
+monomers = ["O=C1CCO1"] # list[str]
+# monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"] # list[str]
 
-[step1]
-title = "Step 1 Config"
+# RDKIT -------------
+
+[rdkit]
 n_cores = 16
-n_conformers = 20
-
-[step1.rdkit]
+n_conformers = 20 # TODO: need to decide on initial conformer no.
 random_seed = 42
 conformer_box_size = 2.0
 precision = 6
@@ -18,26 +61,52 @@ mmff = "MMFF94"
 mmff_iters = 200
 align_iters = 50
 
-[step1.xtb]
+# XTB -------------
+
+[xtb]
+[xtb.rdkit]
+parallel = 16
+ohess = "vtight"
+etemp = 298.15
 verbose = true
 json = true
-ohess = "vtight"
 alpb = "toluene"
 gfn = 2
 acc = 1.0
 iterations = 250
+
+[xtb.crest]
+parallel = 16
+hess = true
+# ohess = "vtight"
+# bhess = "vtight"
 etemp = 298.15
+verbose = true
+json = true
+alpb = "toluene"
+gfn = 2
+acc = 0.5
+iterations = 500
 
-# ----------------------
+[xtb.censo]
+parallel = 16
+bhess = "vtight"
+# hess = true
+# ohess = "vtight"
+etemp = 298.15
+verbose = true
+json = true
+alpb = "toluene"
+gfn = 2
+acc = 0.25
+iterations = 1000
 
-[step2]
-title = "Step 2 Config"
-n_cores = 8
+# CREST -------------
 
-[step2.crest]
-
-[step2.crest.confgen]
+[crest]
+[crest.confgen]
 # general
+T = 16
 niceprint = true
 # runtype
 v3 = true
@@ -65,34 +134,54 @@ athr = 0.04
 nmr = true
 temp = 298.15
 
-[step2.xtb.thermo]
+[crest.entropy]
+
+# general
+T = 16
+niceprint = true
 # runtype
-# thermo = true
-# legacy = true
+entropy = true
 # level of theory
-# gfn2 = true
-# alpb = "toluene"
-# entropy mode settings
-# ptot = 0.9
-# fscal = 1.0
-# sthr = 25.0
-# ithr = -50.0
-
-verbose = true
-json = true
-hess = true
+gfn2 = true
 alpb = "toluene"
-gfn = 2
-acc = 1.0
-iterations = 250
-temp = 298.15
+optlev = "vtight"
+# molecular dynamics
+mdlen = "x1"
+shake = 2
+tstep = 5
+mddump = 100
+vbdump = 1
+# conformational search
+tnmd = 400
+mrest = 5
+maxflip = 100
+keepdir = false
+# entropy mode settings
+scthr = 0.02
+ssthr = 0.005
+ptot = 0.9
+fscal = 1.0
 sthr = 25.0
+ithr = -50.0
+# ensemble sorting (CREGEN)
+ewin = 6.0
+rthr = 0.125
+ethr = 0.05
+bthr = 0.01
+athr = 0.04
+nmr = true
+temp = 298.15
 
-[step2.censo]
+# CENSO -------------
 
-[step2.censo.general]
+[censo]
+
+[censo.cli]
+maxcores = 8
+
+[censo.general]
 imagthr = -100.0
-sthr = 0.0
+sthr = 25.0 # changed to match paper?
 scale = 1.0
 temperature = 298.15
 solvent = "toluene"
@@ -106,17 +195,18 @@ gas-phase = false
 copy_mo = true
 retry_failed = true
 
-[step2.censo.prescreening]
-threshold = 4.0
+[censo.prescreening]
+run = true
+threshold = 4.0 # changed
 func = "pbe-d4"
 basis = "def2-SV(P)"
 prog = "orca"
 gfnv = "gfn2"
 template = false
-run = true
 
-[step2.censo.screening]
-threshold = 3.5
+[censo.screening]
+run = true
+threshold = 0.0 # changed
 func = "r2scan-3c"
 basis = "def2-TZVP"
 prog = "orca"
@@ -124,27 +214,27 @@ sm = "smd"
 gfnv = "gfn2"
 implicit = true
 template = false
-run = true
 
-[step2.censo.optimization]
+[censo.optimization]
+run = true
+threshold = 0.0 # changed
 macrocycles = true
 optcycles = 8
 maxcyc = 200
-threshold = 3.0
 hlow = 0.01
 gradthr = 0.01
 func = "r2scan-3c"
 basis = "def2-TZVP"
 prog = "orca"
 sm = "smd"
+xtb_opt = true
 gfnv = "gfn2"
 optlevel = "normal"
 template = false
-xtb_opt = true
-run = true
 
-[step2.censo.refinement]
-threshold = 0.95
+[censo.refinement]
+run = true
+threshold = 2.5 # changed
 func = "wb97x-v"
 basis = "def2-TZVP"
 prog = "orca"
@@ -152,9 +242,8 @@ sm = "smd"
 gfnv = "gfn2"
 implicit = true
 template = false
-run = true
 
-[step2.censo.nmr]
+[censo.nmr]
 resonance_frequency = 300.0
 ss_cutoff = 8.0
 prog = "orca"
@@ -174,9 +263,9 @@ c_active = true
 f_active = false
 si_active = false
 p_active = false
-run = true
+run = false # unnecessary?
 
-[step2.censo.uvvis]
+[censo.uvvis]
 prog = "orca"
 func = "wb97x-d4"
 basis = "def2-TZVP"
@@ -184,7 +273,7 @@ sm = "smd"
 gfnv = "gfn2"
 nroots = 20
 template = false
-run = true
+run = false # unnecessary?
 
-[step2.censo.paths]
-orcaversion = "6.1.0"
+[censo.paths]
+orcaversion = "6.1.0" # replace as necessary

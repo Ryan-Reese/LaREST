@@ -46,6 +46,7 @@ ignore = [
     "D", # disable docstrings for now
     "PLR", # disable refactor warnings
     "PTH", # switch all paths to Pathlib objects
+    "COM819" # trialing commas
 ]
 pydocstyle.convention = "numpy"
 isort.known-first-party = ["src"]

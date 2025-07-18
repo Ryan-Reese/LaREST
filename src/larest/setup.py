@@ -21,18 +21,18 @@ def get_config(args: argparse.Namespace) -> dict[str, Any]:
         return config
 
 
-def get_logger(
+def setup_logger(
     name: str,
     args: argparse.Namespace,
     config: dict[str, Any],
 ) -> logging.Logger:
     try:
-        log_config: dict[str, Any] = config["logging"]
-        # print(Path(args.output))
-        # print(log_config["handlers"]["file"]["filename"])
-        # log_config["handlers"]["file"]["filename"] = (
-        #     Path(args.output) / log_config["handlers"]["file"]["filename"]
-        # )
+        log_config: dict[str, Any] = config["logging"].copy()  # need to fix logging
+        log_config["handlers"]["file"]["filename"] = (
+            Path(args.output)
+            .joinpath(log_config["handlers"]["file"]["filename"])
+            .resolve()
+        )
         logging.config.dictConfig(log_config)
     except Exception:
         print(f"Failed to setup logging config from {config}")

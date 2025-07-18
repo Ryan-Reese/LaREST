@@ -9,8 +9,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from larest.parsers import parse_best_rdkit_conformer
-
 
 def create_dir(dir_path: Path, logger: logging.Logger) -> None:
     # create specified dir

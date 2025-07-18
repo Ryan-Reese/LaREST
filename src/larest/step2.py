@@ -273,14 +273,14 @@ def main(
                 config=config,
                 logger=logger,
             )
-            # run_censo(
-            #     smiles=polymer_smiles,
-            #     mol_type="polymer",
-            #     dir_name=polymer_dir_name,
-            #     args=args,
-            #     config=config,
-            #     logger=logger,
-            # )
+            run_censo(
+                smiles=polymer_smiles,
+                mol_type="polymer",
+                dir_name=polymer_dir_name,
+                args=args,
+                config=config,
+                logger=logger,
+            )
             # run_xtb_thermo(
             #     smiles=initiator_smiles,
             #     mol_type="initiator",

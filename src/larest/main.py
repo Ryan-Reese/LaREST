@@ -4,9 +4,9 @@ from typing import Any
 
 from tqdm import tqdm
 
-from larest.base import Initiator, Monomer, Polymer
+from larest.base import Monomer
 from larest.parsers import LarestArgumentParser
-from larest.setup import get_config, get_logger
+from larest.setup import get_config, setup_logger
 
 
 def main(
@@ -14,22 +14,6 @@ def main(
     config: dict[str, Any],
     logger: logging.Logger,
 ) -> None:
-    # run pipeline for initiator if ROR reaction
-    if config["reaction"]["type"] == "ROR":
-        logger.info("ROR Reaction detected, running pipeline for initiator")
-        initiator: Initiator = Initiator(
-            smiles=config["reaction"]["initiator"],
-            args=args,
-            config=config,
-        )
-        try:
-            initiator.run()
-        except Exception as err:
-            logger.exception("Failed to run pipeline for initiator")
-            raise SystemExit(1) from err
-        else:
-            logger.info("Finished running pipeline for initiator")
-
     # run pipeline for each monomer
     logger.info("Running pipeline for monomers")
     for monomer_smiles in tqdm(
@@ -50,6 +34,19 @@ def main(
         else:
             logger.info("Finished running pipeline for monomer")
 
+        # run pipeline for initiator if ROR reaction
+        if config["reaction"]["type"] == "ROR":
+            logger.info("ROR Reaction detected, running pipeline for initiator")
+            try:
+                monomer.initiator.run()
+            except Exception as err:
+                logger.exception(
+                    f"Failed to run pipeline for initiator {monomer.initiator.smiles}",
+                )
+                raise SystemExit(1) from err
+            else:
+                logger.info("Finished running pipeline for initiator")
+
         # run pipeline for each polymer length
         for polymer in tqdm(
             monomer.polymers,
@@ -65,7 +62,8 @@ def main(
             else:
                 logger.info("Finished running pipeline for polymer")
 
-        monomer.compile_monomer_results()
+        if config["steps"]["xtb"]:
+            monomer.compile_xtb_results()
 
 
 if __name__ == "__main__":
@@ -81,7 +79,7 @@ if __name__ == "__main__":
 
     # load logging config from config file
     try:
-        main_logger: logging.Logger = get_logger(
+        main_logger: logging.Logger = setup_logger(
             name=__name__,
             args=args,
             config=config,

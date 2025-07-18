@@ -243,7 +243,7 @@ def parse_best_censo_conformers(
 
         for section in CENSO_SECTIONS:
             logger.debug(
-                f"Best conformer in {section}: {best_censo_conformers['section']}",
+                f"Best conformer in {section}: {best_censo_conformers[section]}",
             )
 
         return best_censo_conformers

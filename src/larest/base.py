@@ -126,13 +126,13 @@ class LarestMol(metaclass=ABCMeta):
 
     def run(self) -> None:
         try:
-            # if self.config["steps"]["rdkit"]:
-            #     self._run_rdkit()
-            # if self.config["steps"]["crest_confgen"]:
-            #     self._run_crest_confgen()
-            # if self.config["steps"]["censo"]:
-            #     create_censorc(args=self.args, logger=self.logger)
-            #     self._run_censo()
+            if self.config["steps"]["rdkit"]:
+                self._run_rdkit()
+            if self.config["steps"]["crest_confgen"]:
+                self._run_crest_confgen()
+            if self.config["steps"]["censo"]:
+                create_censorc(args=self.args, logger=self.logger)
+                self._run_censo()
             if self.config["steps"]["crest_entropy"]:
                 self._run_crest_entropy()
             if self.config["steps"]["xtb"]:
@@ -388,6 +388,7 @@ class LarestMol(metaclass=ABCMeta):
         if self.config["steps"]["xtb"]:
             best_crest_conformer_xyz_file: Path = crest_dir / "crest_best.xyz"
             xtb_dir: Path = self.dir_path / "xtb" / "crest"
+            create_dir(xtb_dir, self.logger)
             xtb_results: dict[str, float | None] = self._run_xtb(
                 xtb_input_file=best_crest_conformer_xyz_file,
                 xtb_dir=xtb_dir,
@@ -450,7 +451,10 @@ class LarestMol(metaclass=ABCMeta):
                     continue
 
                 censo_conformers_xyz_file: Path = censo_dir / f"{section}.xyz"
+
                 xtb_dir: Path = self.dir_path / "xtb" / "censo" / section
+                create_dir(xtb_dir, self.logger)
+
                 best_conformer_xyz_file: Path = xtb_dir / f"{section}.xyz"
 
                 extract_best_conformer_xyz(
@@ -475,8 +479,6 @@ class LarestMol(metaclass=ABCMeta):
         xtb_dir: Path,
         xtb_sub_config: list[str],
     ) -> dict[str, float | None]:
-        create_dir(xtb_dir, self.logger)
-
         # Optimisation with xTB
         xtb_args: list[str] = [
             "xtb",
@@ -531,7 +533,7 @@ class LarestMol(metaclass=ABCMeta):
             )
 
         self.logger.debug(
-            f"Finished writing results for {self.__class__.__name__} ({self.smiles})",
+            f"Finished writing results for {self.__class__.__name__}",
         )
 
         return xtb_results
@@ -556,7 +558,7 @@ class LarestMol(metaclass=ABCMeta):
         create_dir(crest_dir, self.logger)
 
         best_censo_conformer_xyz_file: Path = (
-            self.dir_path / "censo" / "3.REFINEMENT.xyz"
+            self.dir_path / "censo" / "3_REFINEMENT.xyz"
         )
 
         # specify location for crest log file

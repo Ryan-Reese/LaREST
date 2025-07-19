@@ -43,17 +43,15 @@ orca = true
 
 [reaction]
 type = "ROR" # ["RER", "ROR"]
-lengths = [1]
-# lengths = [1, 2, 3] # list[int]
+lengths = [1, 2, 3]
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = ["O=C1CCO1"] # list[str]
-# monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1"] # list[str]
+monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1", "O=C1CCCCCO1", "O=C1CCCCCCO1", "O=C1CCCCCCCO1"] # list[str]
 
 # RDKIT -------------
 
 [rdkit]
 n_cores = 16
-n_conformers = 20 # TODO: need to decide on initial conformer no.
+n_conformers = 50 # TODO: need to decide on initial conformer no.
 random_seed = 42
 conformer_box_size = 2.0
 precision = 6
@@ -177,7 +175,7 @@ temp = 298.15
 [censo]
 
 [censo.cli]
-maxcores = 8
+maxcores = 16
 
 [censo.general]
 imagthr = -100.0
@@ -197,7 +195,7 @@ retry_failed = true
 
 [censo.prescreening]
 run = true
-threshold = 4.0 # changed
+threshold = 4.0
 func = "pbe-d4"
 basis = "def2-SV(P)"
 prog = "orca"
@@ -206,7 +204,7 @@ template = false
 
 [censo.screening]
 run = true
-threshold = 0.0 # changed
+threshold = 3.5
 func = "r2scan-3c"
 basis = "def2-TZVP"
 prog = "orca"
@@ -217,7 +215,7 @@ template = false
 
 [censo.optimization]
 run = true
-threshold = 0.0 # changed
+threshold = 0.0
 macrocycles = true
 optcycles = 8
 maxcyc = 200
@@ -234,7 +232,7 @@ template = false
 
 [censo.refinement]
 run = true
-threshold = 2.5 # changed
+threshold = 0.0
 func = "wb97x-v"
 basis = "def2-TZVP"
 prog = "orca"

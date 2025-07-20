@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 #PBS -N LaREST
 #PBS -l walltime=23:59:00
-#PBS -l select=1:ncpus=16:mem=128gb:mpiprocs=16
+#PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
 # source general config file
 CONFIG_FILE="${PBS_O_WORKDIR}/config/general.conf"

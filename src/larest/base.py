@@ -29,11 +29,11 @@ from rdkit.ForceField.rdForceField import MMFFMolProperties
 # from larest.calculators import run_rdkit
 from larest.chem import build_polymer, get_mol, get_ring_size
 from larest.constants import (
+    CENSO_OUTPUT_PARAMS,
     CENSO_SECTIONS,
     CREST_OUTPUT_PARAMS,
     KCALMOL_TO_JMOL,
     PIPELINE_SECTIONS,
-    SUMMARY_HEADINGS,
     XTB_OUTPUT_PARAMS,
 )
 from larest.output import create_dir, slugify
@@ -41,6 +41,7 @@ from larest.parsers import (
     extract_best_conformer_xyz,
     parse_best_censo_conformers,
     parse_best_rdkit_conformer,
+    parse_censo_output,
     parse_command_args,
     parse_crest_entropy_output,
     parse_xtb_output,
@@ -53,8 +54,9 @@ class LarestMol(metaclass=ABCMeta):
     _args: argparse.Namespace
     _config: dict[str, Any]
     _logger: logging.Logger
-    _xtb_results: dict[str, Any]
-    _entropy_results: dict[str, Any]
+    _xtb_results: dict[str, dict[str, float | None]]
+    _entropy_results: dict[str, float | None]
+    _censo_results: dict[str, dict[str, float | None]]
 
     def __init__(
         self,
@@ -71,6 +73,10 @@ class LarestMol(metaclass=ABCMeta):
             dict.fromkeys(XTB_OUTPUT_PARAMS, None),
         )
         self._entropy_results = dict.fromkeys(CREST_OUTPUT_PARAMS, None)
+        self._censo_results = dict.fromkeys(
+            CENSO_SECTIONS,
+            dict.fromkeys(CENSO_OUTPUT_PARAMS, None),
+        )
 
     @property
     def smiles(self) -> str:
@@ -100,6 +106,10 @@ class LarestMol(metaclass=ABCMeta):
     def entropy_results(self) -> dict[str, Any]:
         return self._entropy_results
 
+    @property
+    def censo_results(self) -> dict[str, Any]:
+        return self._censo_results
+
     @smiles.setter
     def smiles(self, smiles: str) -> None:
         self._smiles = smiles
@@ -117,12 +127,16 @@ class LarestMol(metaclass=ABCMeta):
         self._logger = logger
 
     @xtb_results.setter
-    def xtb_results(self, xtb_results: dict[str, Any]) -> None:
+    def xtb_results(self, xtb_results: dict[str, dict[str, float | None]]) -> None:
         self._xtb_results = xtb_results
 
     @entropy_results.setter
-    def entropy_results(self, xtb_results: dict[str, Any]) -> None:
+    def entropy_results(self, xtb_results: dict[str, float | None]) -> None:
         self._entropy_results = xtb_results
+
+    @censo_results.setter
+    def censo_results(self, censo_results: dict[str, dict[str, float | None]]) -> None:
+        self._censo_results = censo_results
 
     def run(self) -> None:
         try:
@@ -131,12 +145,11 @@ class LarestMol(metaclass=ABCMeta):
             if self.config["steps"]["crest_confgen"]:
                 self._run_crest_confgen()
             if self.config["steps"]["censo"]:
-                create_censorc(args=self.args, logger=self.logger)
                 self._run_censo()
             if self.config["steps"]["crest_entropy"]:
                 self._run_crest_entropy()
-            if self.config["steps"]["xtb"]:
-                self._write_xtb_results()
+
+            self._write_results()
         except Exception:
             self.logger.exception("Error encountered within pipeline, exiting...")
             raise
@@ -403,6 +416,10 @@ class LarestMol(metaclass=ABCMeta):
         Running CENSO to DFT refine the conformer ensemble from CREST.
         Subsequently performing thermo calculations using xTB on best conformers (if desired)
         """
+
+        # create .censo2rc for run
+        create_censorc(args=self.args, logger=self.logger)
+
         censo_dir: Path = self.dir_path / "censo"
         create_dir(censo_dir, self.logger)
 
@@ -440,6 +457,14 @@ class LarestMol(metaclass=ABCMeta):
             self.logger.exception(err)
             self.logger.exception(f"Failed to run CENSO with arguments {censo_args}")
             raise
+
+        censo_results: dict[str, dict[str, float | None]] = parse_censo_output(
+            censo_output_file=censo_output_file,
+            temperature=self.config["censo"]["general"]["temperature"],
+            logger=self.logger,
+        )
+
+        self.censo_results |= censo_results
 
         if self.config["steps"]["xtb"]:
             best_censo_conformers: dict[str, str] = parse_best_censo_conformers(
@@ -538,12 +563,23 @@ class LarestMol(metaclass=ABCMeta):
 
         return xtb_results
 
-    def _write_xtb_results(self) -> None:
+    def _write_results(self) -> None:
         xtb_results_file: Path = self.dir_path / "xtb" / "results.json"
 
         with open(xtb_results_file, "w") as fstream:
             json.dump(
                 self.xtb_results,
+                fstream,
+                sort_keys=True,
+                indent=4,
+                allow_nan=True,
+            )
+
+        censo_results_file: Path = self.dir_path / "censo" / "results.json"
+
+        with open(censo_results_file, "w") as fstream:
+            json.dump(
+                self.censo_results,
                 fstream,
                 sort_keys=True,
                 indent=4,
@@ -588,20 +624,27 @@ class LarestMol(metaclass=ABCMeta):
             self.logger.exception(f"Failed to run CREST with arguments {crest_args}")
             raise
 
-        crest_results = parse_crest_entropy_output(
+        crest_results: dict[str, float | None] = parse_crest_entropy_output(
             crest_output_file=crest_output_file,
             logger=self.logger,
         )
 
         self.entropy_results = self.entropy_results | crest_results
 
-        if self.config["steps"]["xtb"] and self.config["steps"]["censo"]:
-            censo_corrected_results = self.xtb_results["3_REFINEMENT"].copy()
+        if self.config["steps"]["xtb"]:
+            crest_corrected_results: dict[str, float | None] = self.xtb_results[
+                "crest"
+            ].copy()
+            crest_corrected_results["S"] += self.entropy_results["S_total"]
+            self.xtb_results["crest_corrected"] = crest_corrected_results
+
+        if self.config["steps"]["censo"]:
+            censo_corrected_results: dict[str, float | None] = self.censo_results[
+                "3_REFINEMENT"
+            ].copy()
             censo_corrected_results["S"] += self.entropy_results["S_total"]
 
-            self.xtb_results = self.xtb_results | {
-                "censo_corrected": censo_corrected_results,
-            }
+            self.censo_results["censo_corrected"] = censo_corrected_results
 
         crest_results_file: Path = crest_dir / "results.json"
         self.logger.debug(f"Writing results to {crest_results_file}")
@@ -720,55 +763,118 @@ class Monomer(LarestMol):
             for length in self.config["reaction"]["lengths"]
         ]
 
-    def compile_xtb_results(self) -> None:
+    def compile_results(self) -> None:
         summary_dir: Path = self.dir_path / "summary"
         create_dir(summary_dir, self.logger)
 
-        # iterating over pipeline sections (e.g. rdkit, censo, crest)
-        for section in self.xtb_results:
-            xtb_summary: dict[str, list[float]] = {
-                heading: [] for heading in SUMMARY_HEADINGS
-            }
+        # iterating over pipeline sections for xTB
+        if self.config["steps"]["xtb"]:
+            for section in self.xtb_results:
+                xtb_summary_headings: list[str] = ["polymer_length"]
+                for mol_type in ["monomer", "initiator", "polymer"]:
+                    xtb_summary_headings.extend(
+                        [f"{mol_type}_{param}" for param in XTB_OUTPUT_PARAMS],
+                    )
 
-            # iterating over polymer lengths
-            for polymer in self.polymers:
-                # adding monomer and polymer results
-                xtb_summary["polymer_length"].append(polymer.length)
+                xtb_summary: dict[str, list[float]] = {
+                    heading: [] for heading in xtb_summary_headings
+                }
+
+                # iterating over polymer lengths
+                for polymer in self.polymers:
+                    # adding monomer and polymer results
+                    xtb_summary["polymer_length"].append(polymer.length)
+                    for param in XTB_OUTPUT_PARAMS:
+                        xtb_summary[f"polymer_{param}"].append(
+                            polymer.xtb_results[section][param],
+                        )
+                        xtb_summary[f"monomer_{param}"].append(
+                            self.xtb_results[section][param],
+                        )
+                        xtb_summary[f"initiator_{param}"].append(
+                            self.initiator.xtb_results[section][param]
+                            if (self.config["reaction"]["type"] == "ROR")
+                            else 0,
+                        )
+
+                # converting to df
+                xtb_summary_df: pd.DataFrame = pd.DataFrame(
+                    xtb_summary,
+                    index=None,
+                    dtype=np.float64,
+                ).sort_values(
+                    "polymer_length",
+                    ascending=True,
+                )
+
+                # calculating deltas
                 for param in XTB_OUTPUT_PARAMS:
-                    xtb_summary[f"polymer_{param}"].append(
-                        polymer.xtb_results[section][param],
-                    )
-                    xtb_summary[f"monomer_{param}"].append(
-                        self.xtb_results[section][param],
-                    )
-                    xtb_summary[f"initiator_{param}"].append(
-                        self.initiator.xtb_results[section][param]
-                        if (self.config["reaction"]["type"] == "ROR")
-                        else 0,
+                    xtb_summary_df[f"delta_{param}"] = (
+                        xtb_summary_df[f"polymer_{param}"]
+                        - (
+                            xtb_summary_df["polymer_length"]
+                            * xtb_summary_df[f"monomer_{param}"]
+                        )
+                        - xtb_summary_df[f"initiator_{param}"]
+                    ) / xtb_summary_df["polymer_length"]
+
+                # specify to save results
+                xtb_summary_file: Path = summary_dir / f"{section}_xtb.csv"
+
+                xtb_summary_df.to_csv(xtb_summary_file, header=True, index=False)
+
+        # iterating over pipeline sections for CENSO
+        if self.config["steps"]["censo"]:
+            for section in self.censo_results:
+                censo_summary_headings: list[str] = ["polymer_length"]
+                for mol_type in ["monomer", "initiator", "polymer"]:
+                    censo_summary_headings.extend(
+                        [f"{mol_type}_{param}" for param in CENSO_OUTPUT_PARAMS],
                     )
 
-            # converting to df
-            xtb_summary_df: pd.DataFrame = pd.DataFrame(
-                xtb_summary,
-                index=None,
-                dtype=np.float64,
-            ).sort_values(
-                "polymer_length",
-                ascending=True,
-            )
+                censo_summary: dict[str, list[float]] = {
+                    heading: [] for heading in censo_summary_headings
+                }
 
-            # calculating deltas
-            for param in XTB_OUTPUT_PARAMS:
-                xtb_summary_df[f"delta_{param}"] = (
-                    xtb_summary_df[f"polymer_{param}"]
-                    - (
-                        xtb_summary_df["polymer_length"]
-                        * xtb_summary_df[f"monomer_{param}"]
-                    )
-                    - xtb_summary_df[f"initiator_{param}"]
-                ) / xtb_summary_df["polymer_length"]
+                # iterating over polymer lengths
+                for polymer in self.polymers:
+                    # adding monomer and polymer results
+                    censo_summary["polymer_length"].append(polymer.length)
+                    for param in CENSO_OUTPUT_PARAMS:
+                        censo_summary[f"polymer_{param}"].append(
+                            polymer.censo_results[section][param],
+                        )
+                        censo_summary[f"monomer_{param}"].append(
+                            self.censo_results[section][param],
+                        )
+                        censo_summary[f"initiator_{param}"].append(
+                            self.initiator.censo_results[section][param]
+                            if (self.config["reaction"]["type"] == "ROR")
+                            else 0,
+                        )
 
-            # specify to save results
-            xtb_summary_file: Path = summary_dir / f"{section}.csv"
+                # converting to df
+                censo_summary_df: pd.DataFrame = pd.DataFrame(
+                    censo_summary,
+                    index=None,
+                    dtype=np.float64,
+                ).sort_values(
+                    "polymer_length",
+                    ascending=True,
+                )
 
-            xtb_summary_df.to_csv(xtb_summary_file, header=True, index=False)
+                # calculating deltas
+                for param in CENSO_OUTPUT_PARAMS:
+                    censo_summary_df[f"delta_{param}"] = (
+                        censo_summary_df[f"polymer_{param}"]
+                        - (
+                            censo_summary_df["polymer_length"]
+                            * censo_summary_df[f"monomer_{param}"]
+                        )
+                        - censo_summary_df[f"initiator_{param}"]
+                    ) / censo_summary_df["polymer_length"]
+
+                # specify to save results
+                censo_summary_file: Path = summary_dir / f"{section}.csv"
+
+                censo_summary_df.to_csv(censo_summary_file, header=True, index=False)

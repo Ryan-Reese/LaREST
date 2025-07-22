@@ -20,12 +20,17 @@ XTB_OUTPUT_PARAMS: list[str] = [
     "H",
     "S",
     "G",
-    "E",
+    "U",
 ]
 CREST_OUTPUT_PARAMS: list[str] = [
     "S_conf",
     "S_rrho",
     "S_total",
+]
+CENSO_OUTPUT_PARAMS: list[str] = [
+    "G",
+    "H",  # internal energy taken as enthalpy
+    "S",
 ]
 CENSO_SECTIONS: list[str] = [
     "0_PRESCREENING",
@@ -40,7 +45,6 @@ PIPELINE_SECTIONS: list[str] = [
     "1_SCREENING",
     "2_OPTIMIZATION",
     "3_REFINEMENT",
-    "censo_corrected",
 ]
 SUMMARY_HEADINGS: list[str] = [
     "polymer_length",
@@ -53,7 +57,7 @@ SUMMARY_HEADINGS: list[str] = [
     "monomer_G",
     "initiator_G",
     "polymer_G",
-    "monomer_E",
-    "initiator_E",
-    "polymer_E",
+    "monomer_U",
+    "initiator_U",
+    "polymer_U",
 ]

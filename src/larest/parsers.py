@@ -9,6 +9,7 @@ import pandas as pd
 
 from larest.constants import (
     CALMOL_TO_JMOL,
+    CENSO_OUTPUT_PARAMS,
     CENSO_SECTIONS,
     CREST_OUTPUT_PARAMS,
     HARTTREE_TO_JMOL,
@@ -97,7 +98,7 @@ def parse_xtb_output(
 ) -> dict[str, float | None]:
     xtb_output: dict[str, float | None] = dict.fromkeys(XTB_OUTPUT_PARAMS, None)
 
-    logger.debug(f"Searching for results in file {xtb_output_file}")
+    logger.debug(f"Searching for xTB results in file {xtb_output_file}")
     try:
         with open(xtb_output_file) as fstream:
             for i, line in enumerate(fstream):
@@ -203,6 +204,58 @@ def parse_crest_entropy_output(
         )
 
         return crest_output
+
+
+def parse_censo_output(
+    censo_output_file: Path,
+    temperature: float,
+    logger: logging.Logger,
+) -> dict[str, dict[str, float | None]]:
+    censo_output: dict[str, dict[str, float | None]] = dict.fromkeys(
+        CENSO_SECTIONS,
+        dict.fromkeys(CENSO_OUTPUT_PARAMS, None),
+    )
+
+    logger.debug(f"Searching for CENSO results in file {censo_output_file}")
+    try:
+        with open(censo_output_file) as fstream:
+            for i, line in enumerate(fstream):
+                for part_no, section in enumerate(CENSO_SECTIONS):
+                    if f"part{part_no}" in line:
+                        try:
+                            censo_output[section]["H"] = (
+                                float(line.split()[1]) * HARTTREE_TO_JMOL
+                            )
+                            censo_output[section]["G"] = (
+                                float(line.split()[2]) * HARTTREE_TO_JMOL
+                            )
+                        except Exception as err:
+                            logger.exception(err)
+                            logger.exception(
+                                f"Failed to extract H and G from line {i}: {line}",
+                            )
+    except Exception as err:
+        logger.exception(err)
+        logger.exception(
+            f"Failed to parse censo results from {censo_output_file}",
+        )
+        raise
+    else:
+        for params in censo_output.values():
+            if params["H"] and params["G"]:
+                params["S"] = (params["H"] - params["G"]) / temperature
+
+            if not all(params.values()):
+                logger.warning(
+                    f"Failed to extract necessary data from {censo_output_file}",
+                )
+                logger.warning("Missing data will be assigned None")
+
+            logger.debug(
+                f"Found enthalpy: {params['H']}, free energy: {params['G']}, entropy {params['S']}",
+            )
+
+        return censo_output
 
 
 def parse_best_censo_conformers(

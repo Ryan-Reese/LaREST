@@ -63,7 +63,7 @@ def main(
                 logger.info("Finished running pipeline for polymer")
 
         if config["steps"]["xtb"]:
-            monomer.compile_xtb_results()
+            monomer.compile_results()
 
 
 if __name__ == "__main__":

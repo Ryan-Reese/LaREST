@@ -34,10 +34,9 @@ level = "DEBUG" # [DEBUG, INFO]
 [steps]
 rdkit = true
 crest_confgen = true
-censo = true
-crest_entropy = true
+censo = false
+crest_entropy = false
 xtb = true
-orca = true
 
 # REACTION -------------
 
@@ -45,12 +44,26 @@ orca = true
 type = "ROR" # ["RER", "ROR"]
 lengths = [1, 2, 3]
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = ["O=C1CCO1", "O=C1CCCO1", "O=C1CCCCO1", "O=C1CCCCCO1", "O=C1CCCCCCO1", "O=C1CCCCCCCO1",  "O=C1CCCCCCCCO1",  "O=C1CCCCCCCCCO1"] # list[str]
+monomers = [ # list[str]
+    "O=C1CCO1",
+    "O=C1CCCO1",
+    "O=C1CCCCO1",
+    "O=C1CCCCCO1",
+    "O=C1CCCCCCO1",
+    "O=C1CCCCCCCO1",
+    "O=C1CCCCCCCCO1",
+    "O=C1CCCCCCCCCO1",
+    "O=C1CCCCCCCCCCO1",
+    "O=C1CCCCCCCCCCCO1",
+    "O=C1CCCCCCCCCCCCO1",
+    "O=C1CCCCCCCCCCCCCO1",
+    "O=C1CCCCCCCCCCCCCCO1",
+]
 
 # RDKIT -------------
 
 [rdkit]
-n_cores = 128
+n_cores = 16
 n_conformers = 50 # TODO: need to decide on initial conformer no.
 random_seed = 42
 conformer_box_size = 2.0
@@ -63,7 +76,7 @@ align_iters = 50
 
 [xtb]
 [xtb.rdkit]
-parallel = 128
+parallel = 16
 ohess = "vtight"
 etemp = 298.15
 verbose = true
@@ -74,7 +87,7 @@ acc = 1.0
 iterations = 250
 
 [xtb.crest]
-parallel = 128
+parallel = 16
 hess = true
 # ohess = "vtight"
 # bhess = "vtight"
@@ -104,7 +117,7 @@ iterations = 1000
 [crest]
 [crest.confgen]
 # general
-T = 128
+T = 16
 niceprint = true
 # runtype
 v3 = true

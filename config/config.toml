@@ -204,7 +204,7 @@ template = false
 
 [censo.screening]
 run = true
-threshold = 3.5
+threshold = 2.0
 func = "r2scan-3c"
 basis = "def2-TZVP"
 prog = "orca"

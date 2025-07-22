@@ -725,7 +725,7 @@ class Monomer(LarestMol):
         create_dir(summary_dir, self.logger)
 
         # iterating over pipeline sections (e.g. rdkit, censo, crest)
-        for section in PIPELINE_SECTIONS:
+        for section in self.xtb_results:
             xtb_summary: dict[str, list[float]] = {
                 heading: [] for heading in SUMMARY_HEADINGS
             }

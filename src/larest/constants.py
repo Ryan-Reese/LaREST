@@ -46,18 +46,3 @@ PIPELINE_SECTIONS: list[str] = [
     "2_OPTIMIZATION",
     "3_REFINEMENT",
 ]
-SUMMARY_HEADINGS: list[str] = [
-    "polymer_length",
-    "monomer_H",
-    "initiator_H",
-    "polymer_H",
-    "monomer_S",
-    "initiator_S",
-    "polymer_S",
-    "monomer_G",
-    "initiator_G",
-    "polymer_G",
-    "monomer_U",
-    "initiator_U",
-    "polymer_U",
-]

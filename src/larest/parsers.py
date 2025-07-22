@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -104,7 +103,7 @@ def parse_xtb_output(
             for i, line in enumerate(fstream):
                 if "TOTAL ENERGY" in line:
                     try:
-                        xtb_output["E"] = float(line.split()[3]) * HARTTREE_TO_JMOL
+                        xtb_output["U"] = float(line.split()[3]) * HARTTREE_TO_JMOL
                     except Exception as err:
                         logger.exception(err)
                         logger.exception(
@@ -140,7 +139,7 @@ def parse_xtb_output(
             f"Found enthalpy: {xtb_output['H']}, entropy: {xtb_output['S']}",
         )
         logger.debug(
-            f"Free energy {xtb_output['G']}, total energy {xtb_output['E']}",
+            f"Free energy {xtb_output['G']}, internal energy {xtb_output['U']}",
         )
 
         return xtb_output

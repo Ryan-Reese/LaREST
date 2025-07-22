@@ -34,15 +34,16 @@ level = "DEBUG" # [DEBUG, INFO]
 [steps]
 rdkit = true
 crest_confgen = true
-censo = false
-crest_entropy = false
+censo = true
+crest_entropy = true
 xtb = true
 
 # REACTION -------------
 
 [reaction]
-type = "ROR" # ["RER", "ROR"]
-lengths = [1, 2, 3]
+type = "RER" # ["RER", "ROR"]
+# lengths = [1, 2, 3]
+lengths = [2]
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
 monomers = [ # list[str]
     "O=C1CCO1",
@@ -100,7 +101,7 @@ acc = 0.5
 iterations = 500
 
 [xtb.censo]
-parallel = 128
+parallel = 16
 bhess = "vtight"
 # hess = true
 # ohess = "vtight"
@@ -148,11 +149,12 @@ temp = 298.15
 [crest.entropy]
 
 # general
-T = 128
+T = 16
 niceprint = true
 # runtype
 entropy = true
 # level of theory
+# gfnff = true
 gfn2 = true
 alpb = "toluene"
 optlev = "vtight"
@@ -188,7 +190,7 @@ temp = 298.15
 [censo]
 
 [censo.cli]
-maxcores = 128
+maxcores = 8
 
 [censo.general]
 imagthr = -100.0

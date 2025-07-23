@@ -1,0 +1,292 @@
+# Configuration Options for LaREST
+
+# LOGGING -----------
+
+[logging]
+version = 1
+
+[logging.formatters]
+
+[logging.formatters.default]
+format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
+
+[logging.handlers]
+
+[logging.handlers.file]
+class = "logging.FileHandler"
+level = "DEBUG"
+encoding = "utf-8"
+filename = "larest.log"
+formatter = "default"
+mode = "a"
+
+[logging.handlers.stream]
+class = "logging.StreamHandler"
+level = "DEBUG"
+formatter = "default"
+
+[logging.root]
+handlers = ["file", "stream"]
+level = "DEBUG" # [DEBUG, INFO]
+
+# STEPS -------------
+
+[steps]
+rdkit = true
+crest_confgen = true
+censo = true
+crest_entropy = true
+xtb = true
+
+# REACTION -------------
+
+[reaction]
+type = "RER" # ["RER", "ROR"]
+# lengths = [1, 2, 3]
+lengths = [2, 3, 4] # lengths for RER
+initiator = "C1=CC=C(C=C1)C(=O)O" # str
+monomers = [ # list[str]
+    "O=C1OCCCCC1", # CL
+    "O=C1OCCC(C)CC1", # M1
+    "O=C1OCCC(CC)CC1",
+    "O=C1OCCC(C(C)C)CC1",
+    "O=C1OCCC(C(C)(C)C)CC1",
+    "O=C1OCCC(C)(C)CC1",
+    "O=C1OCC(C)CC(C)C1",
+    "O=C1OCC(C)(C)CC(C)(C)C1",
+    "O=C1OCCC2=C(C=CC=C2)C1" # M8
+    "O=C1OCCC2(OCCO2)CC1", # M9
+    "O=C1OCCC2(OCCCO2)CC1",
+    "O=C1OCCC2(OCC(C)(C)CO2)CC1",
+    "O=C1OCCC2(OCCCCO2)CC1", # M12
+]
+
+# RDKIT -------------
+
+[rdkit]
+n_cores = 16
+n_conformers = 50 # TODO: need to decide on initial conformer no.
+random_seed = 42
+conformer_box_size = 2.0
+precision = 6
+mmff = "MMFF94"
+mmff_iters = 200
+align_iters = 50
+
+# XTB -------------
+
+[xtb]
+[xtb.rdkit]
+parallel = 16
+ohess = "vtight"
+etemp = 298.15
+verbose = true
+json = true
+alpb = "toluene"
+gfn = 2
+acc = 1.0
+iterations = 250
+
+[xtb.crest]
+parallel = 16
+hess = true
+# ohess = "vtight"
+# bhess = "vtight"
+etemp = 298.15
+verbose = true
+json = true
+alpb = "toluene"
+gfn = 2
+acc = 0.5
+iterations = 500
+
+[xtb.censo]
+parallel = 16
+bhess = "vtight"
+# hess = true
+# ohess = "vtight"
+etemp = 298.15
+verbose = true
+json = true
+alpb = "toluene"
+gfn = 2
+acc = 0.25
+iterations = 1000
+
+# CREST -------------
+
+[crest]
+[crest.confgen]
+# general
+T = 16
+niceprint = true
+# runtype
+v3 = true
+# level of theory
+gfn2 = true
+alpb = "toluene"
+optlev = "vtight"
+# molecular dynamics
+mdlen = "x1"
+shake = 2
+tstep = 5
+mddump = 100
+vbdump = 1
+# conformational search
+tnmd = 400
+mrest = 5
+maxflip = 100
+keepdir = false
+# ensemble sorting (CREGEN)
+ewin = 6.0
+rthr = 0.125
+ethr = 0.05
+bthr = 0.01
+athr = 0.04
+nmr = true
+temp = 298.15
+
+[crest.entropy]
+
+# general
+T = 16
+niceprint = true
+# runtype
+entropy = true
+# level of theory
+# gfnff = true
+gfn2 = true
+alpb = "toluene"
+optlev = "vtight"
+# molecular dynamics
+mdlen = "x1"
+shake = 2
+tstep = 5
+mddump = 100
+vbdump = 1
+# conformational search
+tnmd = 400
+mrest = 5
+maxflip = 100
+keepdir = false
+# entropy mode settings
+scthr = 0.02
+ssthr = 0.005
+ptot = 0.9
+fscal = 1.0
+sthr = 25.0
+ithr = -50.0
+# ensemble sorting (CREGEN)
+ewin = 6.0
+rthr = 0.125
+ethr = 0.05
+bthr = 0.01
+athr = 0.04
+nmr = true
+temp = 298.15
+
+# CENSO -------------
+
+[censo]
+
+[censo.cli]
+maxcores = 16
+
+[censo.general]
+imagthr = -100.0
+sthr = 25.0 # changed to match paper?
+scale = 1.0
+temperature = 298.15
+solvent = "toluene"
+sm_rrho = "alpb"
+evaluate_rrho = true
+consider_sym = true
+bhess = true
+rmsdbias = false
+balance = true
+gas-phase = false
+copy_mo = true
+retry_failed = true
+
+[censo.prescreening]
+run = true
+threshold = 4.0
+func = "pbe-d4"
+basis = "def2-SV(P)"
+prog = "orca"
+gfnv = "gfn2"
+template = false
+
+[censo.screening]
+run = true
+threshold = 2.0
+func = "r2scan-3c"
+basis = "def2-TZVP"
+prog = "orca"
+sm = "smd"
+gfnv = "gfn2"
+implicit = true
+template = false
+
+[censo.optimization]
+run = true
+threshold = 0.0
+macrocycles = true
+optcycles = 4 # changed to help with runtime?
+maxcyc = 200
+hlow = 0.01
+gradthr = 0.01
+func = "r2scan-3c"
+basis = "def2-TZVP"
+prog = "orca"
+sm = "smd"
+xtb_opt = true
+gfnv = "gfn2"
+optlevel = "normal"
+template = false
+
+[censo.refinement]
+run = true
+threshold = 0.0
+func = "wb97x-v"
+basis = "def2-TZVP"
+prog = "orca"
+sm = "smd"
+gfnv = "gfn2"
+implicit = true
+template = false
+
+[censo.nmr]
+resonance_frequency = 300.0
+ss_cutoff = 8.0
+prog = "orca"
+func_j = "pbe0-d4"
+basis_j = "def2-tZVP"
+sm_j = "smd"
+func_s = "pbe0-d4"
+basis_s = "def2-tZVP"
+sm_s = "smd"
+gfnv = "gfn2"
+template = false
+couplings = true
+fc_only = true
+shieldings = true
+h_active = true
+c_active = true
+f_active = false
+si_active = false
+p_active = false
+run = false # unnecessary?
+
+[censo.uvvis]
+prog = "orca"
+func = "wb97x-d4"
+basis = "def2-TZVP"
+sm = "smd"
+gfnv = "gfn2"
+nroots = 20
+template = false
+run = false # unnecessary?
+
+[censo.paths]
+orcaversion = "6.1.0" # replace as necessary

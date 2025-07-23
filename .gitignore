@@ -1,5 +1,5 @@
-# output files
-**/output
+# output and temp files
+**/temp
 
 
 # Byte-compiled / optimized / DLL files

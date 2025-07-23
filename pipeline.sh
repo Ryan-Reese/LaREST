@@ -3,11 +3,22 @@
 #PBS -l walltime=23:59:00
 #PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
-# source general config file
-CONFIG_FILE="${PBS_O_WORKDIR}/config/general.conf"
-if [ -e "${CONFIG_FILE}" ]; then
-    source "${CONFIG_FILE}"
-fi
+# Setting environment variables
+SRC_DIR="src/larest"
+OUTPUT_DIR="output"
+CONFIG_DIR="config"
+CONDA_DIR="${HOME}/miniforge3/bin"
+CONDA_ENV="larest"
+N_CORES=128
+
+# xtb-required options
+ulimit -s unlimited
+ulimit -l unlimited
+export OMP_STACKSIZE=4G
+export OMP_NUM_THREADS="${N_CORES},1"
+export OMP_MAX_ACTIVE_LEVELS=1
+export OPENBLAS_NUM_THREADS=1
+export XTBPATH="$(pwd)"
 
 # load orca
 module load ORCA/6.1.0-gompi-2023b

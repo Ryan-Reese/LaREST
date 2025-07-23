@@ -1,5 +1,5 @@
 # output files
-output/*
+**/output
 
 
 # Byte-compiled / optimized / DLL files

@@ -1,0 +1,23 @@
+# Initial monomer concentration of 0.1-0.5M
+# Initiator p-toylmethanol in d8-Tol
+# Thermodynamic parameters acquired by monitoring the polymerisation equilibrium
+# over a temperature range of 40-70C using variable-temperature 1H-NMR spectroscopy
+# Standard state Hp, Sp, and Tc (1M) values calculated.
+name,delta_h,delta_s
+CL,-14.0,-6.0
+M1,-16.2,-14.9
+M2,-14.0,-14.0
+M3,-14.8,-21.3
+M4,-12.7,-24.7
+M5,-15.6,-22.4
+M6,-20.0,-34.4
+M7,null,null
+M8,-17.5,-23.2
+M9,-17.0,-21.9
+M10,-17.8,-27.9
+M11,-18.5,-30.2
+M12,-19.7,-41.9
+
+
+# 10.1038/s41467-023-38916-5
+# 10.1002/1521-3935(20020401)203:5/6<889::AID-MACP889>3.0.CO;2-O

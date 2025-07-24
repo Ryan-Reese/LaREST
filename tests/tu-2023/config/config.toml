@@ -16,7 +16,7 @@ format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
 class = "logging.FileHandler"
 level = "DEBUG"
 encoding = "utf-8"
-filename = "larest.log"
+filename = "larest6.log"
 formatter = "default"
 mode = "a"
 
@@ -45,21 +45,22 @@ type = "RER" # ["RER", "ROR"]
 # lengths = [1, 2, 3]
 lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = [ # list[str]
-    "O=C1OCCCCC1", # CL
-    "O=C1OCCC(C)CC1", # M1
-    "O=C1OCCC(CC)CC1",
-    "O=C1OCCC(C(C)C)CC1",
-    "O=C1OCCC(C(C)(C)C)CC1",
-    "O=C1OCCC(C)(C)CC1",
-    "O=C1OCC(C)CC(C)C1",
-    "O=C1OCC(C)(C)CC(C)(C)C1",
-    "O=C1OCCC2=C(C=CC=C2)C1", # M8
-    "O=C1OCCC2(OCCO2)CC1", # M9
-    "O=C1OCCC2(OCCCO2)CC1",
-    "O=C1OCCC2(OCC(C)(C)CO2)CC1",
-    "O=C1OCCC2(OCCCCO2)CC1", # M12
-]
+monomers = ["O=C1OCC(C)CC(C)C1"], # M6
+# monomers = [ # list[str]
+#     "O=C1OCCCCC1", # CL
+#     "O=C1OCCC(C)CC1", # M1
+#     "O=C1OCCC(CC)CC1", # M2
+#     "O=C1OCCC(C(C)C)CC1", # M3
+#     "O=C1OCCC(C(C)(C)C)CC1", # M4
+#     "O=C1OCCC(C)(C)CC1", # M5
+#     "O=C1OCC(C)CC(C)C1", # M6
+#     "O=C1OCC(C)(C)CC(C)(C)C1", # M7
+#     "O=C1OCCC2=C(C=CC=C2)C1", # M8
+#     "O=C1OCCC2(OCCO2)CC1", # M9
+#     "O=C1OCCC2(OCCCO2)CC1", # M10
+#     "O=C1OCCC2(OCC(C)(C)CO2)CC1", # M11
+#     "O=C1OCCC2(OCCCCO2)CC1", # M12
+# ]
 
 # RDKIT -------------
 

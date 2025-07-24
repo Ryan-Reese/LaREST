@@ -1,12 +1,12 @@
 #!/usr/bin/bash
 #PBS -N LaREST
-#PBS -l walltime=71:59:00
+#PBS -l walltime=23:59:00
 #PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
 # Setting environment variables
-SRC_DIR="src/larest"
+SRC_DIR="src/larest" # TODO: remove
 OUTPUT_DIR="tests/tu-2023/output"
-CONFIG_DIR="tests/tu-2023/config"
+CONFIG_DIR="tests/tu-2023/config" # contains config.toml
 CONDA_DIR="${HOME}/miniforge3/bin"
 CONDA_ENV="larest"
 N_CORES=128
@@ -27,15 +27,9 @@ module load ORCA/6.1.0-gompi-2023b
 eval "$("${CONDA_DIR}"/conda shell.bash hook)"
 conda activate ${CONDA_ENV}
 
-# DATETIME="$(date '+%Y%m%d%H%M%S')"
-# RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}/larest_${DATETIME}"
-
 # create run directories
 mkdir -p "${PBS_O_WORKDIR}/${OUTPUT_DIR}"
-mkdir -p "${PBS_O_WORKDIR}/${CONFIG_DIR}"
-
-# copy config to run directory
-# cp -r "${PBS_O_WORKDIR}/${CONFIG_DIR}" "${RUN_DIR}"
 
 # run LaREST
+# larest -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"
 python "${PBS_O_WORKDIR}/${SRC_DIR}/main.py" -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"

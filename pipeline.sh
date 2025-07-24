@@ -4,9 +4,8 @@
 #PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
 # Setting environment variables
-SRC_DIR="src/larest"
 OUTPUT_DIR="output"
-CONFIG_DIR="config"
+CONFIG_DIR="config" # contains config.toml
 CONDA_DIR="${HOME}/miniforge3/bin"
 CONDA_ENV="larest"
 N_CORES=128
@@ -28,13 +27,7 @@ eval "$("${CONDA_DIR}"/conda shell.bash hook)"
 conda activate ${CONDA_ENV}
 
 # create run directory
-DATETIME="$(date '+%Y%m%d%H%M%S')"
-RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}/larest_${DATETIME}"
-mkdir -p "${RUN_DIR}"
-
-# copy config to run directory
-cp -r "${PBS_O_WORKDIR}/${CONFIG_DIR}" "${RUN_DIR}"
+mkdir -p "${PBS_O_WORKDIR}/${OUTPUT_DIR}"
 
 # run LaREST
-python "${PBS_O_WORKDIR}/${SRC_DIR}/main.py" -o "${RUN_DIR}" -c "${RUN_DIR}/${CONFIG_DIR}"
-
+larest -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"

@@ -1,9 +1,11 @@
 [build-system]
-requires = ["setuptools >= 42", "versioningit ~= 1.0", "wheel"]
+requires = ["setuptools", "versioningit ~= 1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "larest"
+# version = "0.0.1"
+dependencies = [] # TODO
 description = "Lactone Ring-opening Energetics Sorting Tool"
 readme = "README.md"
 keywords = ["polymerisation", "xtb", "CREST", "CENSO", "DFT", "SQM"]
@@ -26,6 +28,15 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 requires-python = ">=3.11"
+
+[project.scripts]
+larest = "larest.main:entry_point"
+
+[tool.setuptools.packages.find]
+where = ["src"]  # ["."] by default
+include = ["*"]  # ["*"] by default
+exclude = []  # empty by default
+namespaces = true  # true by default
 
 [tool.ruff]
 line-length = 88

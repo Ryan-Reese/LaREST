@@ -43,7 +43,7 @@ def main(
                 logger.exception(
                     f"Failed to run pipeline for initiator {monomer.initiator.smiles}",
                 )
-                raise SystemExit(1) from err
+                continue
             else:
                 logger.info("Finished running pipeline for initiator")
 
@@ -62,11 +62,10 @@ def main(
             else:
                 logger.info("Finished running pipeline for polymer")
 
-        if config["steps"]["xtb"]:
-            monomer.compile_results()
+        monomer.compile_results()
 
 
-if __name__ == "__main__":
+def entry_point() -> None:
     # parse input arguments to get output and config dirs
     parser: LarestArgumentParser = LarestArgumentParser()
     args: argparse.Namespace = parser.parse_args()
@@ -94,3 +93,7 @@ if __name__ == "__main__":
     # TODO: write assertions for config
 
     main(args=args, config=config, logger=main_logger)
+
+
+if __name__ == "__main__":
+    entry_point()

@@ -17,10 +17,10 @@ def create_dir(dir_path: Path, logger: logging.Logger) -> None:
         logger.debug(f"Directory {dir_path} created")
 
 
-# taken from django.utils
+# modified from django.utils
 def slugify(smiles: str) -> str:
     smiles = (
         unicodedata.normalize("NFKD", smiles).encode("ascii", "ignore").decode("ascii")
     )
-    smiles = re.sub(r"[^\w\s-]", "", smiles.lower())
+    smiles = re.sub(r"[^\w\s\(\)@-]", "", smiles)
     return re.sub(r"[-\s]+", "-", smiles).strip("-_")

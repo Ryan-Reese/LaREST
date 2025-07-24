@@ -6,7 +6,7 @@
 # Setting environment variables
 SRC_DIR="src/larest"
 OUTPUT_DIR="tests/tu-2023/output"
-CONFIG_DIR="config"
+CONFIG_DIR="tests/tu-2023/config"
 CONDA_DIR="${HOME}/miniforge3/bin"
 CONDA_ENV="larest"
 N_CORES=16
@@ -39,4 +39,3 @@ mkdir -p "${PBS_O_WORKDIR}/${CONFIG_DIR}"
 
 # run LaREST
 python "${PBS_O_WORKDIR}/${SRC_DIR}/main.py" -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"
-

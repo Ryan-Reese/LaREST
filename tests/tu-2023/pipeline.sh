@@ -30,13 +30,13 @@ conda activate ${CONDA_ENV}
 # DATETIME="$(date '+%Y%m%d%H%M%S')"
 # RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}/larest_${DATETIME}"
 
-# create run directory
-RUN_DIR="${PBS_O_WORKDIR}/${OUTPUT_DIR}"
-mkdir -p "${RUN_DIR}"
+# create run directories
+mkdir -p "${PBS_O_WORKDIR}/${OUTPUT_DIR}"
+mkdir -p "${PBS_O_WORKDIR}/${CONFIG_DIR}"
 
 # copy config to run directory
 # cp -r "${PBS_O_WORKDIR}/${CONFIG_DIR}" "${RUN_DIR}"
 
 # run LaREST
-python "${PBS_O_WORKDIR}/${SRC_DIR}/main.py" -o "${RUN_DIR}" -c "${RUN_DIR}/${CONFIG_DIR}"
+python "${PBS_O_WORKDIR}/${SRC_DIR}/main.py" -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"
 

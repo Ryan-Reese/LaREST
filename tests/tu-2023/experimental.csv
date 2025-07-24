@@ -3,6 +3,8 @@
 # Thermodynamic parameters acquired by monitoring the polymerisation equilibrium
 # over a temperature range of 40-70C using variable-temperature 1H-NMR spectroscopy
 # Standard state Hp, Sp, and Tc (1M) values calculated.
+
+
 name,delta_h,delta_s
 CL,-14.0,-6.0
 M1,-16.2,-14.9

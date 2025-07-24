@@ -54,7 +54,7 @@ monomers = [ # list[str]
     "O=C1OCCC(C)(C)CC1",
     "O=C1OCC(C)CC(C)C1",
     "O=C1OCC(C)(C)CC(C)(C)C1",
-    "O=C1OCCC2=C(C=CC=C2)C1" # M8
+    "O=C1OCCC2=C(C=CC=C2)C1", # M8
     "O=C1OCCC2(OCCO2)CC1", # M9
     "O=C1OCCC2(OCCCO2)CC1",
     "O=C1OCCC2(OCC(C)(C)CO2)CC1",

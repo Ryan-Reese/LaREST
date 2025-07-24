@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 #PBS -N LaREST
-#PBS -l walltime=23:59:00
-#PBS -l select=1:ncpus=16:mem=128gb:mpiprocs=16
+#PBS -l walltime=71:59:00
+#PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
 # Setting environment variables
 SRC_DIR="src/larest"
@@ -9,7 +9,7 @@ OUTPUT_DIR="tests/tu-2023/output"
 CONFIG_DIR="tests/tu-2023/config"
 CONDA_DIR="${HOME}/miniforge3/bin"
 CONDA_ENV="larest"
-N_CORES=16
+N_CORES=128
 
 # xtb-required options
 ulimit -s unlimited

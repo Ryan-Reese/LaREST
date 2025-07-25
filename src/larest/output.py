@@ -22,5 +22,6 @@ def slugify(smiles: str) -> str:
     smiles = (
         unicodedata.normalize("NFKD", smiles).encode("ascii", "ignore").decode("ascii")
     )
-    smiles = re.sub(r"[^\w\s\(\)@-]", "", smiles)
+    smiles = re.sub(r"[\(\)]", "-", smiles)
+    smiles = re.sub(r"[^\w\s@-]", "", smiles)
     return re.sub(r"[-\s]+", "-", smiles).strip("-_")

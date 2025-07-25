@@ -563,29 +563,6 @@ class LarestMol(metaclass=ABCMeta):
 
         return xtb_results
 
-    def _write_results(self) -> None:
-        xtb_results_file: Path = self.dir_path / "xtb" / "results.json"
-
-        with open(xtb_results_file, "w") as fstream:
-            json.dump(
-                self.xtb_results,
-                fstream,
-                sort_keys=True,
-                indent=4,
-                allow_nan=True,
-            )
-
-        censo_results_file: Path = self.dir_path / "censo" / "results.json"
-
-        with open(censo_results_file, "w") as fstream:
-            json.dump(
-                self.censo_results,
-                fstream,
-                sort_keys=True,
-                indent=4,
-                allow_nan=True,
-            )
-
     def _run_crest_entropy(self) -> None:
         """
         Running CREST to estimate the conformational entropy of the ensemble.
@@ -661,6 +638,81 @@ class LarestMol(metaclass=ABCMeta):
         self.logger.debug(
             f"Finished writing results for {self.__class__.__name__} ({self.smiles})",
         )
+
+    def load_results(self) -> bool:
+        xtb_results_file: Path = self.dir_path / "xtb" / "results.json"
+        if xtb_results_file.exists():
+            try:
+                with open(xtb_results_file) as fstream:
+                    self.xtb_results = json.load(
+                        fstream,
+                    )
+            except Exception as err:
+                self.logger.exception(err)
+                self.logger.exception(
+                    f"Failed to load pre-existing xtb_results from {xtb_results_file}",
+                )
+            else:
+                self.logger.info(
+                    f"Loaded pre-existing xtb_results from {xtb_results_file}",
+                )
+        else:
+            self.logger.info(
+                f"No pre-existing xtb_results detected in {xtb_results_file}",
+            )
+            self.logger.info("Continuing by running pipeline...")
+
+            return False
+
+        censo_results_file: Path = self.dir_path / "censo" / "results.json"
+
+        if censo_results_file.exists():
+            try:
+                with open(censo_results_file) as fstream:
+                    self.censo_results = json.load(
+                        fstream,
+                    )
+            except Exception as err:
+                self.logger.exception(err)
+                self.logger.exception(
+                    f"Failed to load pre-existing censo_results from {censo_results_file}",
+                )
+            else:
+                self.logger.info(
+                    f"Loaded pre-existing censo_results from {censo_results_file}",
+                )
+        else:
+            self.logger.info(
+                f"No pre-existing xtb_results detected in {xtb_results_file}",
+            )
+            self.logger.info("Continuing by running pipeline...")
+
+            return False
+
+        return True
+
+    def _write_results(self) -> None:
+        xtb_results_file: Path = self.dir_path / "xtb" / "results.json"
+
+        with open(xtb_results_file, "w") as fstream:
+            json.dump(
+                self.xtb_results,
+                fstream,
+                sort_keys=True,
+                indent=4,
+                allow_nan=True,
+            )
+
+        censo_results_file: Path = self.dir_path / "censo" / "results.json"
+
+        with open(censo_results_file, "w") as fstream:
+            json.dump(
+                self.censo_results,
+                fstream,
+                sort_keys=True,
+                indent=4,
+                allow_nan=True,
+            )
 
 
 class Initiator(LarestMol):

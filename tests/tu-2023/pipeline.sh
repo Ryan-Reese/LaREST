@@ -4,11 +4,10 @@
 #PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
 # Setting environment variables
-SRC_DIR="src/larest" # TODO: remove
 OUTPUT_DIR="tests/tu-2023/output"
 CONFIG_DIR="tests/tu-2023/config" # contains config.toml
 CONDA_DIR="${HOME}/miniforge3/bin"
-CONDA_ENV="larest"
+CONDA_ENV="larest-main"
 N_CORES=128
 
 # xtb-required options
@@ -27,9 +26,8 @@ module load ORCA/6.1.0-gompi-2023b
 eval "$("${CONDA_DIR}"/conda shell.bash hook)"
 conda activate ${CONDA_ENV}
 
-# create run directories
+# create run directory
 mkdir -p "${PBS_O_WORKDIR}/${OUTPUT_DIR}"
 
 # run LaREST
-# larest -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"
-python "${PBS_O_WORKDIR}/${SRC_DIR}/main.py" -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"
+larest -o "${PBS_O_WORKDIR}/${OUTPUT_DIR}" -c "${PBS_O_WORKDIR}/${CONFIG_DIR}"

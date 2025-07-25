@@ -45,7 +45,7 @@ type = "RER" # ["RER", "ROR"]
 # lengths = [1, 2, 3]
 lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = ["O=C1OCC(C)CC(C)C1"], # M6
+monomers = ["O=C1OCC(C)CC(C)C1"] # M6
 # monomers = [ # list[str]
 #     "O=C1OCCCCC1", # CL
 #     "O=C1OCCC(C)CC1", # M1
@@ -155,8 +155,8 @@ niceprint = true
 # runtype
 entropy = true
 # level of theory
-# gfnff = true
-gfn2 = true
+gfnff = true
+# gfn2 = true # WARN: takes very long time
 alpb = "toluene"
 optlev = "vtight"
 # molecular dynamics
@@ -195,7 +195,7 @@ maxcores = 128
 
 [censo.general]
 imagthr = -100.0
-sthr = 25.0 # changed to match paper?
+sthr = 25.0 # changed to match CREST paper?
 scale = 1.0
 temperature = 298.15
 solvent = "toluene"
@@ -234,7 +234,7 @@ run = true
 threshold = 0.0
 macrocycles = true
 optcycles = 4 # changed to help with runtime?
-maxcyc = 200
+maxcyc = 100 # changed to help with runtime?
 hlow = 0.01
 gradthr = 0.01
 func = "r2scan-3c"

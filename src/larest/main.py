@@ -39,7 +39,7 @@ def main(
             logger.info("ROR Reaction detected, running pipeline for initiator")
             try:
                 monomer.initiator.run()
-            except Exception as err:
+            except Exception:
                 logger.exception(
                     f"Failed to run pipeline for initiator {monomer.initiator.smiles}",
                 )
@@ -53,6 +53,10 @@ def main(
             desc="Running pipeline for each polymer length",
         ):
             try:
+                # if results already exist for this polymer length
+                # prevents repeat computations
+                if polymer.load_results():
+                    continue
                 polymer.run()
             except Exception:
                 logger.exception(

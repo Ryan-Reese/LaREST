@@ -46,23 +46,6 @@ class LarestArgumentParser(argparse.ArgumentParser):
         )
 
 
-# def parse_monomer_smiles(args: argparse.Namespace, logger: logging.Logger) -> list[str]:
-#     input_file = os.path.join(args.config, "input.txt")
-#     logger.debug(f"Reading monomer smiles from {input_file}")
-#
-#     try:
-#         with open(input_file) as fstream:
-#             monomer_smiles = fstream.read().splitlines()
-#     except Exception as err:
-#         logger.exception(err)
-#         logger.exception("Failed to read input monomer smiles")
-#         raise SystemExit(1) from err
-#     else:
-#         for i, smiles in enumerate(monomer_smiles):
-#             logger.debug(f"Read monomer {i}: {smiles}")
-# return monomer_smiles
-
-
 def parse_command_args(
     sub_config: list[str],
     config: dict[str, Any],
@@ -210,29 +193,33 @@ def parse_censo_output(
     temperature: float,
     logger: logging.Logger,
 ) -> dict[str, dict[str, float | None]]:
-    censo_output: dict[str, dict[str, float | None]] = dict.fromkeys(
-        CENSO_SECTIONS,
-        dict.fromkeys(CENSO_OUTPUT_PARAMS, None),
-    )
+    # WARN: cannot use fromkeys, otherwise they all point to the same dict
+    censo_output: dict[str, dict[str, float | None]] = {
+        section: {param: None for param in CENSO_OUTPUT_PARAMS}
+        for section in CENSO_SECTIONS
+    }
 
     logger.debug(f"Searching for CENSO results in file {censo_output_file}")
     try:
         with open(censo_output_file) as fstream:
+            section_no: int = 0
             for i, line in enumerate(fstream):
-                for part_no, section in enumerate(CENSO_SECTIONS):
-                    if f"part{part_no}" in line:
-                        try:
-                            censo_output[section]["H"] = (
-                                float(line.split()[1]) * HARTTREE_TO_JMOL
-                            )
-                            censo_output[section]["G"] = (
-                                float(line.split()[2]) * HARTTREE_TO_JMOL
-                            )
-                        except Exception as err:
-                            logger.exception(err)
-                            logger.exception(
-                                f"Failed to extract H and G from line {i}: {line}",
-                            )
+                if f"part{section_no}" in line:
+                    try:
+                        censo_output[CENSO_SECTIONS[section_no]]["H"] = (
+                            float(line.split()[1]) * HARTTREE_TO_JMOL
+                        )
+                        censo_output[CENSO_SECTIONS[section_no]]["G"] = (
+                            float(line.split()[2]) * HARTTREE_TO_JMOL
+                        )
+
+                    except Exception as err:
+                        logger.exception(err)
+                        logger.exception(
+                            f"Failed to extract H and G from line {i}: {line}",
+                        )
+                    else:
+                        section_no += 1
     except Exception as err:
         logger.exception(err)
         logger.exception(

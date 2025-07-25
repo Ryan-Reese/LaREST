@@ -68,15 +68,15 @@ class LarestMol(metaclass=ABCMeta):
         self.args = args
         self.config = config
         self.logger = logging.getLogger(name=self.__class__.__name__)
-        self._xtb_results = dict.fromkeys(
-            PIPELINE_SECTIONS,
-            dict.fromkeys(XTB_OUTPUT_PARAMS, None),
-        )
+        self._xtb_results = {
+            section: {param: None for param in XTB_OUTPUT_PARAMS}
+            for section in PIPELINE_SECTIONS
+        }
+        self._censo_results = {
+            section: {param: None for param in CENSO_OUTPUT_PARAMS}
+            for section in CENSO_SECTIONS
+        }
         self._entropy_results = dict.fromkeys(CREST_OUTPUT_PARAMS, None)
-        self._censo_results = dict.fromkeys(
-            CENSO_SECTIONS,
-            dict.fromkeys(CENSO_OUTPUT_PARAMS, None),
-        )
 
     @property
     def smiles(self) -> str:

@@ -27,7 +27,8 @@ def main(
             config=config,
         )
         try:
-            monomer.run()
+            if not monomer.load_final_results():
+                monomer.run()
         except Exception:
             logger.exception(f"Failed to run pipeline for monomer {monomer_smiles}")
             continue
@@ -38,7 +39,8 @@ def main(
         if config["reaction"]["type"] == "ROR":
             logger.info("ROR Reaction detected, running pipeline for initiator")
             try:
-                monomer.initiator.run()
+                if not monomer.initiator.load_final_results():
+                    monomer.initiator.run()
             except Exception:
                 logger.exception(
                     f"Failed to run pipeline for initiator {monomer.initiator.smiles}",
@@ -55,7 +57,7 @@ def main(
             try:
                 # if results already exist for this polymer length
                 # prevents repeat computations
-                if polymer.load_results():
+                if polymer.load_final_results():
                     continue
                 polymer.run()
             except Exception:
@@ -80,7 +82,7 @@ def entry_point() -> None:
     except Exception as err:
         raise SystemExit(1) from err
 
-    # load logging config from config file
+    # setup logger using config in config file
     try:
         main_logger: logging.Logger = setup_logger(
             name=__name__,

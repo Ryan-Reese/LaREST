@@ -35,7 +35,6 @@ level = "DEBUG" # [DEBUG, INFO]
 rdkit = true
 crest_confgen = true
 censo = true
-# censo = false # remove CENSO for now
 crest_entropy = true
 xtb = true
 
@@ -47,6 +46,7 @@ type = "RER" # ["RER", "ROR"]
 lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
 monomers = [ # list[str]
+    "O=C1OCCC(C)CC1", # test
     "O=C1OCCCCC1", # CL
     "O=C1OCCC(C)CC1", # M1
     "O=C1OCCC(CC)CC1",

@@ -324,11 +324,9 @@ def extract_best_conformer_xyz(
         )
 
 
-def parse_best_rdkit_conformer(xtb_rdkit_dir: Path) -> dict[str, float]:
-    xtb_results_file: Path = xtb_rdkit_dir / "results.csv"
-
+def parse_best_rdkit_conformer(xtb_rdkit_results_file: Path) -> dict[str, float]:
     xtb_results_df: pd.DataFrame = pd.read_csv(
-        xtb_results_file,
+        xtb_rdkit_results_file,
         header=0,
         index_col=False,
         dtype=np.float64,

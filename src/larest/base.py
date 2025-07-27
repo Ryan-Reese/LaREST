@@ -140,19 +140,56 @@ class LarestMol(metaclass=ABCMeta):
 
     def run(self) -> None:
         try:
-            if self.config["steps"]["rdkit"]:
+            if self.config["steps"]["rdkit"] and not self._load_rdkit_results():
                 self._run_rdkit()
-            if self.config["steps"]["crest_confgen"]:
+            if (
+                self.config["steps"]["crest_confgen"]
+                and not self._load_crest_confgen_results()
+            ):
                 self._run_crest_confgen()
             if self.config["steps"]["censo"]:
                 self._run_censo()
             if self.config["steps"]["crest_entropy"]:
                 self._run_crest_entropy()
 
-            self._write_results()
+            self._write_final_results()
         except Exception:
             self.logger.exception("Error encountered within pipeline, exiting...")
             raise
+
+    def _load_rdkit_results(self) -> bool:
+        xtb_rdkit_results_file: Path = self.dir_path / "xtb" / "rdkit" / "results.csv"
+
+        if xtb_rdkit_results_file.exists():
+            try:
+                best_rdkit_conformer_results: dict[str, float] = (
+                    parse_best_rdkit_conformer(xtb_rdkit_results_file)
+                )
+                del best_rdkit_conformer_results["conformer_id"]
+                self.xtb_results |= {
+                    "rdkit": best_rdkit_conformer_results,
+                }
+            except Exception as err:
+                self.logger.exception(err)
+                self.logger.exception(
+                    f"Failed to load pre-existing rdkit results from {xtb_rdkit_results_file}",
+                )
+                return False
+            else:
+                self.logger.info(
+                    f"Loaded pre-existing rdkit results from {xtb_rdkit_results_file}",
+                )
+                self.logger.debug(
+                    f"Pre-existing rdkit results:\n {best_rdkit_conformer_results}"
+                )
+                return True
+        else:
+            self.logger.info(
+                f"No pre-existing rdkit results detected in {xtb_rdkit_results_file}",
+            )
+            self.logger.info("Continuing by running pipeline...")
+
+            return False
 
     def _run_rdkit(self) -> None:
         # setup RDKit dir if not present
@@ -353,6 +390,41 @@ class LarestMol(metaclass=ABCMeta):
         del best_rdkit_conformer_results["conformer_id"]
         self.xtb_results = self.xtb_results | {"rdkit": best_rdkit_conformer_results}
 
+    def _load_crest_confgen_results(self) -> bool:
+        xtb_crest_confgen_results_file: Path = (
+            self.dir_path / "xtb" / "crest" / "results.json"
+        )
+
+        if xtb_crest_confgen_results_file.exists():
+            try:
+                with open(xtb_crest_confgen_results_file) as fstream:
+                    xtb_crest_confgen_results: dict[str, float | None] = json.load(
+                        fstream,
+                    )
+                    self.xtb_results |= {"crest": xtb_crest_confgen_results}
+
+            except Exception as err:
+                self.logger.exception(err)
+                self.logger.exception(
+                    f"Failed to load pre-existing crest_confgen results from {xtb_crest_confgen_results_file}",
+                )
+                return False
+            else:
+                self.logger.info(
+                    f"Loaded pre-existing crest_confgen results from {xtb_crest_confgen_results_file}",
+                )
+                self.logger.debug(
+                    f"Pre-existing crest_confgen results:\n {xtb_crest_confgen_results}",
+                )
+                return True
+        else:
+            self.logger.info(
+                f"No pre-existing crest_confgen results detected in {xtb_crest_confgen_results_file}",
+            )
+            self.logger.info("Continuing by running pipeline...")
+
+            return False
+
     def _run_crest_confgen(self) -> None:
         """
         Running the CREST standard procedure to generate a conformer/rotamer ensemble.
@@ -362,8 +434,9 @@ class LarestMol(metaclass=ABCMeta):
         create_dir(crest_dir, self.logger)
 
         xtb_rdkit_dir: Path = self.dir_path / "xtb" / "rdkit"
+        xtb_rdkit_results_file: Path = xtb_rdkit_dir / "results.csv"
         best_rdkit_conformer_id: int = int(
-            parse_best_rdkit_conformer(xtb_rdkit_dir)["conformer_id"],
+            parse_best_rdkit_conformer(xtb_rdkit_results_file)["conformer_id"],
         )
         best_rdkit_conformer_xyz_file: Path = (
             xtb_rdkit_dir
@@ -408,8 +481,8 @@ class LarestMol(metaclass=ABCMeta):
                 xtb_sub_config=["xtb", "crest"],
             )
 
-            # add to self.results
-            self.xtb_results = self.xtb_results | {"crest": xtb_results}
+            # add to self.xtb_results
+            self.xtb_results |= {"crest": xtb_results}
 
     def _run_censo(self) -> None:
         """
@@ -496,7 +569,7 @@ class LarestMol(metaclass=ABCMeta):
                 )
 
                 # add to self.results
-                self.xtb_results = self.xtb_results | {section: xtb_results}
+                self.xtb_results |= {section: xtb_results}
 
     def _run_xtb(
         self,
@@ -639,23 +712,26 @@ class LarestMol(metaclass=ABCMeta):
             f"Finished writing results for {self.__class__.__name__} ({self.smiles})",
         )
 
-    def load_results(self) -> bool:
+    def load_final_results(self) -> bool:
+        # checks whether the files output at the end of the pipeline exist
         xtb_results_file: Path = self.dir_path / "xtb" / "results.json"
         if xtb_results_file.exists():
             try:
                 with open(xtb_results_file) as fstream:
-                    self.xtb_results = json.load(
-                        fstream,
-                    )
+                    xtb_results: dict[str, Any] = json.load(fstream)
+                    self.xtb_results |= xtb_results
             except Exception as err:
                 self.logger.exception(err)
                 self.logger.exception(
                     f"Failed to load pre-existing xtb_results from {xtb_results_file}",
                 )
+                self.logger.info("Continuing by running pipeline...")
+                return False
             else:
                 self.logger.info(
                     f"Loaded pre-existing xtb_results from {xtb_results_file}",
                 )
+                self.logger.debug(f"Pre-existing xtb results:\n {xtb_results}")
         else:
             self.logger.info(
                 f"No pre-existing xtb_results detected in {xtb_results_file}",
@@ -669,21 +745,23 @@ class LarestMol(metaclass=ABCMeta):
         if censo_results_file.exists():
             try:
                 with open(censo_results_file) as fstream:
-                    self.censo_results = json.load(
-                        fstream,
-                    )
+                    censo_results: dict[str, Any] = json.load(fstream)
+                    self.censo_results |= censo_results
             except Exception as err:
                 self.logger.exception(err)
                 self.logger.exception(
                     f"Failed to load pre-existing censo_results from {censo_results_file}",
                 )
+                self.logger.info("Continuing by running pipeline...")
+                return False
             else:
                 self.logger.info(
                     f"Loaded pre-existing censo_results from {censo_results_file}",
                 )
+                self.logger.debug(f"Pre-existing censo results:\n {censo_results}")
         else:
             self.logger.info(
-                f"No pre-existing xtb_results detected in {xtb_results_file}",
+                f"No pre-existing censo_results detected in {censo_results_file}",
             )
             self.logger.info("Continuing by running pipeline...")
 
@@ -691,7 +769,7 @@ class LarestMol(metaclass=ABCMeta):
 
         return True
 
-    def _write_results(self) -> None:
+    def _write_final_results(self) -> None:
         xtb_results_file: Path = self.dir_path / "xtb" / "results.json"
 
         with open(xtb_results_file, "w") as fstream:

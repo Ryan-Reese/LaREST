@@ -167,7 +167,7 @@ def parse_crest_entropy_output(
         )
         raise
     else:
-        if not all(crest_output.values()):
+        if not all(value is not None for value in crest_output.values()):
             logger.warning(f"Failed to extract necessary data from {crest_output_file}")
             logger.warning("Missing data will be assigned None")
         logger.debug(
@@ -286,7 +286,7 @@ def extract_best_conformer_xyz(
     logger: logging.Logger,
 ) -> None:
     logger.debug(
-        f"Extracting best conformer ({best_conformer_id} .xyz from {censo_conformers_xyz_file}",
+        f"Extracting best conformer ({best_conformer_id}) .xyz from {censo_conformers_xyz_file}",
     )
     try:
         with open(censo_conformers_xyz_file) as fin:

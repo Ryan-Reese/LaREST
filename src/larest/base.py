@@ -234,6 +234,13 @@ class LarestMol(metaclass=ABCMeta):
 
         # Running xTB for all conformers
         self._logger.debug("Computing thermodynamic parameters of conformers using xTB")
+
+        xtb_default_args: list[str] = parse_command_args(
+            sub_config=["xtb", "rdkit"],
+            config=self._config,
+            logger=self._logger,
+        )
+
         for conformer in mol_supplier:
             # Conformer id and location of xyz file
             conformer_id: int = conformer.GetIntProp("conformer_id")
@@ -271,17 +278,13 @@ class LarestMol(metaclass=ABCMeta):
             )
 
             # Optimisation with xTB
-            xtb_args: list[str] = [
+            xtb_conformer_args: list[str] = [
                 "xtb",
                 str(conformer_xyz_file.absolute()),
                 "--namespace",
                 f"conformer_{conformer_id}",
             ]
-            xtb_args += parse_command_args(
-                sub_config=["xtb", "rdkit"],
-                config=self._config,
-                logger=self._logger,
-            )
+            xtb_args: list[str] = xtb_conformer_args + xtb_default_args
 
             try:
                 with open(xtb_output_file, "w") as fstream:
@@ -670,9 +673,8 @@ class LarestMol(metaclass=ABCMeta):
             except Exception as err:
                 self._logger.exception(err)
                 self._logger.exception(
-                    f"Failed to load pre-existing final results from {results_file}",
+                    f"Failed to load pre-existing final results from {results_file}, will run LaREST pipeline",
                 )
-                self._logger.info("Continuing by running pipeline...")
                 return False
             else:
                 self._logger.info(
@@ -682,9 +684,9 @@ class LarestMol(metaclass=ABCMeta):
                 return True
         else:
             self._logger.info(
-                f"No pre-existing final results detected in {results_file}",
+                f"No pre-existing final results detected in {results_file}, will run LaREST pipeline",
             )
-            self._logger.info("Continuing by running pipeline...")
+            self._logger.info("Pipeline will be run for molecule")
 
             return False
 
@@ -755,8 +757,8 @@ class Polymer(LarestMol):
         args: Namespace,
         config: dict[str, Any],
     ) -> None:
-        super().__init__(smiles=smiles, args=args, config=config)
         self._length = length
+        super().__init__(smiles=smiles, args=args, config=config)
 
 
 class Monomer(LarestMol):

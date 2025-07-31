@@ -5,7 +5,7 @@
 # Standard state Hp, Sp, and Tc (1M) values calculated.
 
 
-name,delta_h,delta_s
+name,delta_H,delta_S
 CL,-14.0,-6.0
 M1,-16.2,-14.9
 M2,-14.0,-14.0
@@ -21,5 +21,6 @@ M11,-18.5,-30.2
 M12,-19.7,-41.9
 
 
+# References:
 # 10.1038/s41467-023-38916-5
 # 10.1002/1521-3935(20020401)203:5/6<889::AID-MACP889>3.0.CO;2-O

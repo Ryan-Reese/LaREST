@@ -45,22 +45,21 @@ type = "RER" # ["RER", "ROR"]
 # lengths = [1, 2, 3]
 lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = ["O=C1OCC(C)CC(C)C1"] # M6
-# monomers = [ # list[str]
-#     "O=C1OCCCCC1", # CL
-#     "O=C1OCCC(C)CC1", # M1
-#     "O=C1OCCC(CC)CC1", # M2
-#     "O=C1OCCC(C(C)C)CC1", # M3
-#     "O=C1OCCC(C(C)(C)C)CC1", # M4
-#     "O=C1OCCC(C)(C)CC1", # M5
-#     "O=C1OCC(C)CC(C)C1", # M6
-#     "O=C1OCC(C)(C)CC(C)(C)C1", # M7
-#     "O=C1OCCC2=C(C=CC=C2)C1", # M8
-#     "O=C1OCCC2(OCCO2)CC1", # M9
-#     "O=C1OCCC2(OCCCO2)CC1", # M10
-#     "O=C1OCCC2(OCC(C)(C)CO2)CC1", # M11
-#     "O=C1OCCC2(OCCCCO2)CC1", # M12
-# ]
+monomers = [ # list[str]
+    "O=C1OCCCCC1", # CL
+    "O=C1OCCC(C)CC1", # M1
+    "O=C1OCCC(CC)CC1", # M2
+    "O=C1OCCC(C(C)C)CC1", # M3
+    "O=C1OCCC(C(C)(C)C)CC1", # M4
+    "O=C1OCCC(C)(C)CC1", # M5
+    "O=C1OCC(C)CC(C)C1", # M6
+    "O=C1OCC(C)(C)CC(C)(C)C1", # M7
+    "O=C1OCCC2=C(C=CC=C2)C1", # M8
+    "O=C1OCCC2(OCCO2)CC1", # M9
+    "O=C1OCCC2(OCCCO2)CC1", # M10
+    "O=C1OCCC2(OCC(C)(C)CO2)CC1", # M11
+    "O=C1OCCC2(OCCCCO2)CC1", # M12
+]
 
 # RDKIT -------------
 
@@ -234,7 +233,7 @@ run = true
 threshold = 0.0
 macrocycles = true
 optcycles = 4 # changed to help with runtime?
-maxcyc = 100 # changed to help with runtime?
+maxcyc = 200 # tends to be enough for convergence
 hlow = 0.01
 gradthr = 0.01
 func = "r2scan-3c"

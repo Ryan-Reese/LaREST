@@ -804,6 +804,7 @@ class Monomer(LarestMol):
             for length in self._config["reaction"]["lengths"]
         ]
 
+    # TODO: this function needs logging
     def compile_results(self) -> None:
         summary_dir: Path = self.dir_path / "summary"
         create_dir(summary_dir, self._logger)

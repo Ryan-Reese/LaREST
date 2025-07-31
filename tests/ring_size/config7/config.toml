@@ -16,7 +16,7 @@ format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
 class = "logging.FileHandler"
 level = "DEBUG"
 encoding = "utf-8"
-filename = "larest.log"
+filename = "larest7.log"
 formatter = "default"
 mode = "a"
 
@@ -42,16 +42,27 @@ xtb = true
 
 [reaction]
 type = "RER" # ["RER", "ROR"]
-lengths = [2]
+# lengths = [1, 2, 3]
+lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = [ # list[str]
-    "O=C1OCC1", # test
+monomers = [
+    "O=C1OCCCCC1", # 7
 ]
-
+# monomers = [ # list[str]
+#     "O=C1OCC1", # 4
+#     "O=C1OCCC1", # 5
+#     "O=C1OCCCC1", # 6
+#     "O=C1OCCCCC1", # 7
+#     "O=C1OCCCCCC1", # 8
+#     "O=C1OCCCCCCC1", # 9
+#     "O=C1OCCCCCCCC1", # 10
+#     "O=C1OCCCCCCCCC1", # 11
+# ]
+#
 # RDKIT -------------
 
 [rdkit]
-n_cores = 16
+n_cores = 128
 n_conformers = 50 # TODO: need to decide on initial conformer no.
 random_seed = 42
 conformer_box_size = 2.0
@@ -64,7 +75,7 @@ align_iters = 50
 
 [xtb]
 [xtb.rdkit]
-parallel = 16
+parallel = 128
 ohess = "vtight"
 etemp = 298.15
 verbose = true
@@ -75,7 +86,7 @@ acc = 1.0
 iterations = 250
 
 [xtb.crest]
-parallel = 16
+parallel = 128
 hess = true
 etemp = 298.15
 verbose = true
@@ -90,7 +101,7 @@ iterations = 500
 [crest]
 [crest.confgen]
 # general
-T = 16
+T = 128
 niceprint = true
 # runtype
 v3 = true
@@ -121,13 +132,13 @@ temp = 298.15
 [crest.entropy]
 
 # general
-T = 16
+T = 128
 niceprint = true
 # runtype
 entropy = true
 # level of theory
-# gfnff = true # WARN: use this in final config
-gfn2 = true
+gfnff = true
+# gfn2 = true # WARN: takes very long time
 alpb = "toluene"
 optlev = "vtight"
 # molecular dynamics
@@ -162,12 +173,12 @@ temp = 298.15
 [censo]
 
 [censo.cli]
-maxcores = 8
+maxcores = 128
 
 [censo.general]
 imagthr = -100.0
-sthr = 25.0 # changed to match Pracht/Grimme paper?
-scale = 1.0 # change to match Truhlar et al. recommendations?
+sthr = 25.0 # changed to match CREST paper?
+scale = 1.0
 temperature = 298.15
 solvent = "toluene"
 sm_rrho = "alpb"
@@ -202,7 +213,7 @@ template = false
 
 [censo.optimization]
 run = true
-threshold = 2.0 # increase?
+threshold = 2.0
 macrocycles = true
 optcycles = 4 # changed to help with runtime?
 maxcyc = 200
@@ -219,7 +230,7 @@ template = false
 
 [censo.refinement]
 run = true
-threshold = 1.0 # increase?
+threshold = 1.0
 func = "wb97x-v"
 basis = "def2-TZVP"
 prog = "orca"

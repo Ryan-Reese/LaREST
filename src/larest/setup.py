@@ -1,7 +1,6 @@
 import argparse
 import logging
 import logging.config
-import os
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -56,10 +55,10 @@ def create_censorc(args: argparse.Namespace, logger: logging.Logger) -> None:
 
     try:
         with open(censorc_file, "w") as fstream:
-            for header in censo_config.keys():
+            for header, sub_config in censo_config.items():
                 fstream.write(f"[{header}]\n")
                 fstream.writelines(
-                    f"{key} = {value}\n" for key, value in censo_config[header].items()
+                    f"{key} = {value}\n" for key, value in sub_config.items()
                 )
                 fstream.write("\n")
     except Exception as err:

@@ -15,23 +15,19 @@ MONOMER_GROUPS: dict[str, str] = {
     "oA": "[O;R]-[C;R](=[O;!R])-[N;R]",
     "Lm": "[C,c;R]-[C;R](=[O;!R])-[N;R]",
 }
+# TODO: include additional initiator groups for further customisation
 INITIATOR_GROUPS: dict[str, str] = {"OH": "C[OH]"}
-XTB_OUTPUT_PARAMS: list[str] = [
-    "H",
-    "S",
-    "G",
-    "U",
-]
-CREST_OUTPUT_PARAMS: list[str] = [
+CREST_ENTROPY_OUTPUT_PARAMS: list[str] = [
     "S_conf",
     "S_rrho",
     "S_total",
 ]
-CENSO_OUTPUT_PARAMS: list[str] = [
-    "G",
-    "H",  # internal energy taken as enthalpy
+THERMODYNAMIC_PARAMS: list[str] = [
+    "H",  # E taken as H for CENSO
     "S",
+    "G",
 ]
+
 CENSO_SECTIONS: list[str] = [
     "0_PRESCREENING",
     "1_SCREENING",
@@ -45,4 +41,19 @@ PIPELINE_SECTIONS: list[str] = [
     "1_SCREENING",
     "2_OPTIMIZATION",
     "3_REFINEMENT",
+]
+ENTHALPY_PLOTTING_SECTIONS: list[str] = [
+    "rdkit_xtb",
+    "crest_xtb",
+    # "0_PRESCREENING",
+    "1_SCREENING",
+    "2_OPTIMIZATION",
+    "3_REFINEMENT",
+]
+ENTROPY_PLOTTING_SECTIONS: list[str] = [
+    "rdkit_xtb",
+    "crest_xtb",
+    "crest_corrected_xtb",
+    "3_REFINEMENT",
+    "censo_corrected",
 ]

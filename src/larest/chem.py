@@ -1,4 +1,4 @@
-import logging
+from logging import Logger
 from typing import Any, Literal
 
 from rdkit.Chem.rdchem import Atom, BondType, EditableMol, Mol, RingInfo
@@ -9,18 +9,18 @@ from larest.constants import INITIATOR_GROUPS, MONOMER_GROUPS
 from larest.exceptions import PolymerBuildError
 
 
-def get_mol(smiles: str, logger: logging.Logger) -> Mol:
+def get_mol(smiles: str, logger: Logger) -> Mol:
     """Get an rdkit molecule object from a SMILES string."""
     mol: Mol = MolFromSmiles(smiles)
     if mol is None:
         raise PolymerBuildError(
-            f"Failed to create RDKit Mol object from SMILES: {smiles}"
+            f"Failed to create RDKit Mol object from SMILES: {smiles}",
         )
     logger.debug(f"Created RDKit Mol object from SMILES: {smiles}")
     return mol
 
 
-def get_ring_size(smiles: str, logger: logging.Logger) -> int | None:
+def get_ring_size(smiles: str, logger: Logger) -> int | None:
     """Get the size of the functional group ring in the monomer."""
     try:
         mol: Mol = get_mol(smiles, logger)
@@ -50,7 +50,7 @@ def get_polymer_unit(
     mol_type: Literal["monomer", "initiator"],
     front_dummy: str,
     back_dummy: str,
-    logger: logging.Logger,
+    logger: Logger,
 ) -> Mol:
     # NOTE: output for molecules with >1 ring-opening functional group
     # is deterministic but not yet customisable
@@ -144,7 +144,7 @@ def build_polymer(
     polymer_length: int,
     reaction_type: Literal["ROR", "RER"],
     config: dict[str, Any],
-    logger: logging.Logger,
+    logger: Logger,
 ) -> str:
     if polymer_length <= 1 and reaction_type == "RER":
         raise PolymerBuildError(

@@ -1,5 +1,5 @@
-import argparse
-import logging
+from argparse import Namespace
+from logging import Logger
 from typing import Any
 
 from tqdm import tqdm
@@ -10,9 +10,9 @@ from larest.setup import get_config, setup_logger
 
 
 def main(
-    args: argparse.Namespace,
+    args: Namespace,
     config: dict[str, Any],
-    logger: logging.Logger,
+    logger: Logger,
 ) -> None:
     # run pipeline for each monomer
     logger.info("Running pipeline for monomers")
@@ -55,8 +55,6 @@ def main(
             desc="Running pipeline for each polymer length",
         ):
             try:
-                # if results already exist for this polymer length
-                # prevents repeat computations
                 if polymer.load_final_results():
                     continue
                 polymer.run()
@@ -74,7 +72,7 @@ def main(
 def entry_point() -> None:
     # parse input arguments to get output and config dirs
     parser: LarestArgumentParser = LarestArgumentParser()
-    args: argparse.Namespace = parser.parse_args()
+    args: Namespace = parser.parse_args()
 
     # load LaREST config
     try:
@@ -82,9 +80,9 @@ def entry_point() -> None:
     except Exception as err:
         raise SystemExit(1) from err
 
-    # setup logger using config in config file
+    # setup logger using config
     try:
-        main_logger: logging.Logger = setup_logger(
+        logger: Logger = setup_logger(
             name=__name__,
             args=args,
             config=config,
@@ -92,14 +90,10 @@ def entry_point() -> None:
     except Exception as err:
         raise SystemExit(1) from err
     else:
-        main_logger.info("LaREST Initialised")
+        logger.info("LaREST Initialised")
         for config_key, config_value in config.items():
-            main_logger.debug(f"{config_key} config:\n{config_value}")
+            logger.debug(f"{config_key} config:\n{config_value}")
 
     # TODO: write assertions for config
 
-    main(args=args, config=config, logger=main_logger)
-
-
-if __name__ == "__main__":
-    entry_point()
+    main(args=args, config=config, logger=logger)

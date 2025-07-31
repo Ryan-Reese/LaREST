@@ -8,14 +8,11 @@ import pandas as pd
 
 from larest.constants import (
     CALMOL_TO_JMOL,
-    CENSO_OUTPUT_PARAMS,
     CENSO_SECTIONS,
-    CREST_OUTPUT_PARAMS,
+    CREST_ENTROPY_OUTPUT_PARAMS,
     HARTTREE_TO_JMOL,
-    XTB_OUTPUT_PARAMS,
+    THERMODYNAMIC_PARAMS,
 )
-
-# TODO: this needs to have a new file name/location
 
 
 class LarestArgumentParser(argparse.ArgumentParser):
@@ -57,7 +54,7 @@ def parse_command_args(
     except Exception as err:
         logger.exception(err)
         logger.warning(f"Failed to find sub-config {sub_config} in config {config}")
-        logger.warning("Using default arguments instead")
+        logger.warning("Using default (no) arguments instead")
         return []
 
     args = []
@@ -78,21 +75,16 @@ def parse_xtb_output(
     temperature: float,
     logger: logging.Logger,
 ) -> dict[str, float | None]:
-    xtb_output: dict[str, float | None] = dict.fromkeys(XTB_OUTPUT_PARAMS, None)
+    xtb_output: dict[str, float | None] = dict.fromkeys(
+        THERMODYNAMIC_PARAMS,
+        None,
+    )
 
     logger.debug(f"Searching for xTB results in file {xtb_output_file}")
     try:
         with open(xtb_output_file) as fstream:
             for i, line in enumerate(fstream):
-                if "TOTAL ENERGY" in line:
-                    try:
-                        xtb_output["U"] = float(line.split()[3]) * HARTTREE_TO_JMOL
-                    except Exception as err:
-                        logger.exception(err)
-                        logger.exception(
-                            f"Failed to extract total energy from line {i}: {line}",
-                        )
-                elif "TOTAL ENTHALPY" in line:
+                if "TOTAL ENTHALPY" in line:
                     try:
                         xtb_output["H"] = float(line.split()[3]) * HARTTREE_TO_JMOL
                     except Exception as err:
@@ -119,10 +111,7 @@ def parse_xtb_output(
             logger.warning(f"Failed to extract necessary data from {xtb_output_file}")
             logger.warning("Missing data will be assigned None")
         logger.debug(
-            f"Found enthalpy: {xtb_output['H']}, entropy: {xtb_output['S']}",
-        )
-        logger.debug(
-            f"Free energy {xtb_output['G']}, internal energy {xtb_output['U']}",
+            f"Found enthalpy: {xtb_output['H']}, entropy: {xtb_output['S']}, free energy {xtb_output['G']}",
         )
 
         return xtb_output
@@ -132,7 +121,10 @@ def parse_crest_entropy_output(
     crest_output_file: Path,
     logger: logging.Logger,
 ) -> dict[str, float | None]:
-    crest_output: dict[str, float | None] = dict.fromkeys(CREST_OUTPUT_PARAMS, None)
+    crest_output: dict[str, float | None] = dict.fromkeys(
+        CREST_ENTROPY_OUTPUT_PARAMS,
+        None,
+    )
 
     logger.debug(f"Searching for results in file {crest_output_file}")
     try:
@@ -193,10 +185,9 @@ def parse_censo_output(
     temperature: float,
     logger: logging.Logger,
 ) -> dict[str, dict[str, float | None]]:
-    # WARN: cannot use fromkeys, otherwise they all point to the same dict
+    # WARN: cannot use fromkeys, otherwise they all point to the same mutable dict
     censo_output: dict[str, dict[str, float | None]] = {
-        section: {param: None for param in CENSO_OUTPUT_PARAMS}
-        for section in CENSO_SECTIONS
+        section: dict.fromkeys(THERMODYNAMIC_PARAMS, None) for section in CENSO_SECTIONS
     }
 
     logger.debug(f"Searching for CENSO results in file {censo_output_file}")
@@ -251,13 +242,13 @@ def parse_best_censo_conformers(
     best_censo_conformers: dict[str, str] = dict.fromkeys(CENSO_SECTIONS, "CONF0")
 
     logger.debug(f"Searching for results in file {censo_output_file}")
-    censo_section_id: int = 0
+    section_no: int = 0
     try:
         with open(censo_output_file) as fstream:
             for i, line in enumerate(fstream):
                 if "Highest ranked conformer" in line:
                     try:
-                        best_censo_conformers[CENSO_SECTIONS[censo_section_id]] = (
+                        best_censo_conformers[CENSO_SECTIONS[section_no]] = (
                             line.split()[-1]
                         )
                     except Exception as err:
@@ -266,7 +257,7 @@ def parse_best_censo_conformers(
                             f"Failed to extract best conformer from line {i}: {line}",
                         )
                     else:
-                        censo_section_id += 1
+                        section_no += 1
     except Exception as err:
         logger.exception(err)
         logger.exception(
@@ -278,7 +269,7 @@ def parse_best_censo_conformers(
             logger.warning(
                 f"Failed to extract best conformers from {censo_output_file}",
             )
-            logger.warning("Missing data will be assigned CONF0")
+            logger.warning("Missing sections will be assigned first conformer (CONF0)")
 
         for section in CENSO_SECTIONS:
             logger.debug(
@@ -295,7 +286,7 @@ def extract_best_conformer_xyz(
     logger: logging.Logger,
 ) -> None:
     logger.debug(
-        f"Extracting best conformer ({best_conformer_id} from {censo_conformers_xyz_file}",
+        f"Extracting best conformer ({best_conformer_id} .xyz from {censo_conformers_xyz_file}",
     )
     try:
         with open(censo_conformers_xyz_file) as fin:
@@ -315,16 +306,16 @@ def extract_best_conformer_xyz(
     except Exception as err:
         logger.exception(err)
         logger.exception(
-            f"Failed to extract best censo conformer from {censo_conformers_xyz_file}",
+            f"Failed to extract best censo conformer xyz from {censo_conformers_xyz_file}",
         )
         raise
     else:
         logger.debug(
-            f"Finished extracting best conformer to {output_xyz_file}",
+            f"Finished extracting best conformer xyz to {output_xyz_file}",
         )
 
 
-def parse_best_rdkit_conformer(xtb_rdkit_results_file: Path) -> dict[str, float]:
+def parse_best_rdkit_conformer(xtb_rdkit_results_file: Path) -> dict[str, float | None]:
     xtb_results_df: pd.DataFrame = pd.read_csv(
         xtb_rdkit_results_file,
         header=0,

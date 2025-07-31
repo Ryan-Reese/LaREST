@@ -1,11 +1,12 @@
-import logging
 import os
 import re
+import shutil
 import unicodedata
+from logging import Logger
 from pathlib import Path
 
 
-def create_dir(dir_path: Path, logger: logging.Logger) -> None:
+def create_dir(dir_path: Path, logger: Logger) -> None:
     # create specified dir
     logger.debug(f"Creating directory: {dir_path}")
 
@@ -15,6 +16,19 @@ def create_dir(dir_path: Path, logger: logging.Logger) -> None:
         logger.warning(f"Directory {dir_path} already exists")
     else:
         logger.debug(f"Directory {dir_path} created")
+
+
+def remove_dir(dir_path: Path, logger: Logger) -> None:
+    # remove specified dir
+    logger.debug(f"Removing directory: {dir_path}")
+
+    try:
+        shutil.rmtree(dir_path, ignore_errors=False)
+    except Exception as err:
+        logger.exception(err)
+        logger.warning(f"Failed to remove directory {dir_path}")
+    else:
+        logger.debug(f"Directory {dir_path} removed")
 
 
 # modified from django.utils

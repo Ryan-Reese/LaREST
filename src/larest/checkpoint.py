@@ -3,6 +3,7 @@ from enum import IntEnum
 from logging import Logger
 from pathlib import Path
 
+from larest.exceptions import NoResultsError
 from larest.parsers import parse_best_rdkit_conformer
 
 
@@ -11,6 +12,7 @@ class PipelineStage(IntEnum):
     CREST_CONFGEN = 2
     CENSO = 3
     CREST_ENTROPY = 4
+    FINISH = 5
 
 
 def restore_results(
@@ -40,7 +42,19 @@ def restore_results(
     )
     if not checkpoint_flag:
         return results, PipelineStage.CENSO
-    return results, PipelineStage.CREST_ENTROPY
+    results, checkpoint_flag = _load_crest_entropy_results(
+        results,
+        dir_path,
+        logger,
+    )
+    if not checkpoint_flag:
+        return results, PipelineStage.CREST_ENTROPY
+    results, checkpoint_flag = _load_final_results(
+        results,
+        dir_path,
+        logger,
+    )
+    return results, PipelineStage.FINISH
 
 
 def _load_rdkit_results(
@@ -170,5 +184,90 @@ def _load_censo_results(
             f"No pre-existing censo results detected in {censo_results_file}",
         )
         logger.info("Continuing by running pipeline...")
+
+        return results, False
+
+
+def _load_crest_entropy_results(
+    results: dict[str, dict[str, float | None]],
+    dir_path: Path,
+    logger: Logger,
+) -> tuple[dict[str, dict[str, float | None]], bool]:
+    crest_entropy_results_file: Path = Path(
+        dir_path,
+        "crest_entropy",
+        "results.json",
+    )
+
+    if crest_entropy_results_file.exists():
+        try:
+            with open(crest_entropy_results_file) as fstream:
+                crest_entropy_results: dict[str, float | None] = json.load(
+                    fstream,
+                )
+                censo_corrected_results: dict[str, float | None] = results[
+                    "3_REFINEMENT"
+                ].copy()
+                if (censo_corrected_results["S"] is None) or (
+                    crest_entropy_results["S_total"] is None
+                ):
+                    raise NoResultsError(
+                        "Failed to apply CREST entropy correction to CENSO results",
+                    )
+                censo_corrected_results["S"] += crest_entropy_results["S_total"]
+                results |= {"censo_corrected": censo_corrected_results}
+
+        except Exception as err:
+            logger.exception(err)
+            logger.exception(
+                f"Failed to load pre-existing crest_entropy results from {crest_entropy_results_file}",
+            )
+            return results, False
+        else:
+            logger.info(
+                f"Loaded pre-existing crest_entropy results from {crest_entropy_results_file}",
+            )
+            logger.debug(
+                f"Pre-existing crest_entropy results:\n {crest_entropy_results}",
+            )
+            return results, True
+    else:
+        logger.info(
+            f"No pre-existing crest_entropy results detected in {crest_entropy_results_file}",
+        )
+        logger.info("Continuing by running pipeline...")
+
+        return results, False
+
+
+def _load_final_results(
+    results: dict[str, dict[str, float | None]],
+    dir_path: Path,
+    logger: Logger,
+) -> tuple[dict[str, dict[str, float | None]], bool]:
+    final_results_file: Path = Path(dir_path, "results.json")
+
+    if final_results_file.exists():
+        try:
+            with open(final_results_file) as fstream:
+                final_results: dict[str, dict[str, float | None]] = json.load(fstream)
+                results |= final_results
+        except Exception as err:
+            logger.exception(err)
+            logger.exception(
+                f"Failed to load pre-existing final results from {final_results_file}, will run LaREST pipeline",
+            )
+            return results, False
+        else:
+            logger.info(
+                f"Loaded pre-existing final results from {final_results_file}",
+            )
+            logger.debug(f"Pre-existing final results:\n {results}")
+            return results, True
+    else:
+        logger.info(
+            f"No pre-existing final results detected in {final_results_file}, will run LaREST pipeline",
+        )
+        logger.info("Results will be generated for molecule")
 
         return results, False

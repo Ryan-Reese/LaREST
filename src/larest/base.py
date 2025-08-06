@@ -653,43 +653,6 @@ class LarestMol(metaclass=ABCMeta):
                 indent=4,
             )
 
-    def load_final_results(self) -> bool:
-        """Checks whether final results already exist.
-
-        If so, the LaREST pipeline does not have to be run for the molecule.
-
-        Returns
-        -------
-        bool
-            Whether final results already exist
-
-        """
-        results_file: Path = Path(self.dir_path, "results.json")
-        if results_file.exists():
-            try:
-                with open(results_file) as fstream:
-                    results: dict[str, dict[str, float | None]] = json.load(fstream)
-                    self._results |= results
-            except Exception as err:
-                self._logger.exception(err)
-                self._logger.exception(
-                    f"Failed to load pre-existing final results from {results_file}, will run LaREST pipeline",
-                )
-                return False
-            else:
-                self._logger.info(
-                    f"Loaded pre-existing final results from {results_file}",
-                )
-                self._logger.debug(f"Pre-existing final results:\n {results}")
-                return True
-        else:
-            self._logger.info(
-                f"No pre-existing final results detected in {results_file}, will run LaREST pipeline",
-            )
-            self._logger.info("Pipeline will be run for molecule")
-
-            return False
-
     def _write_final_results(self) -> None:
         results_file: Path = Path(self.dir_path, "results.json")
 
@@ -858,6 +821,17 @@ class Monomer(LarestMol):
                     - (summary_df["polymer_length"] * summary_df[f"monomer_{param}"])
                     - summary_df[f"initiator_{param}"]
                 ) / summary_df["polymer_length"]
+
+            # for param in THERMODYNAMIC_PARAMS:
+            #     summary_df[f"delta_{param}"] = (
+            #         summary_df[f"polymer_{param}"]
+            #         - summary_df[f"polymer_{param}"].shift(
+            #             periods=1,
+            #             fill_value=summary_df[f"monomer_{param}"].iloc[0],
+            #         )
+            #         - summary_df[f"monomer_{param}"]
+            #         - summary_df[f"initiator_{param}"]
+            #     )
 
             # specify to save results
             summary_file: Path = summary_dir / f"{section}.csv"

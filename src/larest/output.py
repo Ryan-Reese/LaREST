@@ -24,8 +24,7 @@ def remove_dir(dir_path: Path, logger: Logger) -> None:
 
     try:
         shutil.rmtree(dir_path, ignore_errors=False)
-    except Exception as err:
-        logger.exception(err)
+    except Exception:
         logger.warning(f"Failed to remove directory {dir_path}")
     else:
         logger.debug(f"Directory {dir_path} removed")

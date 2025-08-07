@@ -53,9 +53,12 @@ def get_experimental_data() -> None:
     df = df.loc[df["temperature"].isna() | (df["temperature"].isin([298, 298.15]))]
     df = df.drop(columns=["temperature"])
 
-    # remove entries with missing data
+    # remove flagged entries
     df = df.loc[df["flag"].isna()]
     df = df.drop(columns=["flag"])
+
+    # remove entries with missing delta_h or delta_s
+    df = df.loc[df["delta_h"].notna() & df["delta_s"].notna()]
 
     # standardise monomer smiles strings
     df["monomer_smiles"] = df["monomer_smiles"].apply(

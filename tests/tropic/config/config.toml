@@ -45,98 +45,98 @@ type = "RER" # ["RER", "ROR"]
 lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
 monomers = [ # list[str]
-    "C=C1CCOC1=O", # 0
-    "CC(C)(C)C1CCOC(=O)CC1", # 1
-    "CC(C)(C)OC(=O)N1CCOC(=O)C1", # 2
-    "CC(C)(C)OC(=O)N1C[C@H]2C[C@@H]1C(=O)S2", # 3
-    "CC(C)C1CCOC(=O)CC1", # 4
-    "CC(C)[C@@H]1CC[C@@H](C)CC(=O)O1", # 5
-    "CC1(C)CCOC(=O)CC1", # 6
-    "CC1(C)COC(=O)OC1", # 7
-    "CC1(C)COC1=O", # 8
-    "CC1(C)COC2(CCOC(=O)CC2)OC1", # 9
-    "CC1(C)SCCSC1=O", # 10
-    "CC1(C)[C@H]2CCC(=O)O[C@@H]1C2", # 11
-    "CC1(c2ccccc2)COC(=O)OC1", # 12
-    "CC1=CCC(=O)O1", # 13
-    "CC1CC(=O)O1", # 14
-    "CC1CCC(=O)OC1", # 15
-    "CC1CCCC(=O)O1", # 16
-    "CC1CCCOC1=O", # 17
-    "CC1CCCSC(=S)S1", # 18
-    "CC1CCCSC1=O", # 19
-    "CC1CCOC(=O)C1", # 20
-    "CC1CCOC(=O)CC1", # 21
-    "CC1CCOC(=O)O1", # 22
-    "CC1COC(=O)CC(C)C1", # 23
-    "CC1OC(=O)C(C)OC1=O", # 24
-    "CC1OC(=O)C(C)SC1=O", # 25
-    "CC1OC(=O)CCOC(=O)C(C)OC(=O)CCOC1=O", # 26
-    "CC1OCCC(=O)O1", # 27
-    "CC1OCCOC1=O", # 28
-    "CC1SC(=O)C(C)SC1=O", # 29
-    "CC1SCCSC1=O", # 30
-    "CCC1(CC)COC(=O)OC1", # 31
-    "CCC1(c2ccccc2)COC(=O)OC1", # 32
-    "CCC1CCCC(=O)O1", # 33
-    "CCC1CCCOC1=O", # 34
-    "CCC1CCOC(=O)CC1", # 35
-    "CCCC1CCCC(=O)O1", # 36
-    "CCCC1CCCOC1=O", # 37
-    "CCCCC1CCCC(=O)O1", # 38
-    "CCCCC1CCCOC1=O", # 39
-    "CCCCCC1CCCC(=O)O1", # 40
-    "CCCCCC1CCCOC1=O", # 41
-    "CCCCCCC1CCCC(=O)O1", # 42
-    "CCCCCCC1CCCOC1=O", # 43
-    "CCCCCCCC1CCCC(=O)O1", # 44
-    "CCCCCCCCCC1CCCC(=O)O1", # 45
-    "C[C@@H]1CC(=O)O[C@@H]2CCCC[C@H]2O1", # 46
-    "C[C@@H]1CC(=O)O[C@H]2CCCC[C@@H]2O1", # 47
-    "C[C@@H]1CC(=O)O[C@H]2CCC[C@@H]2O1", # 48
-    "C[C@@H]1OC(=O)[C@H](C)OC1=O", # 49
-    "C[C@@H]1OCCCOC(=O)[C@H](C)OCCCOC1=O", # 50
-    "Cc1cn([C@H]2C[C@H]3OC(=O)OC[C@H]3O2)c(=O)n(C)c1=O", # 51
-    "O=C1CCC(=O)OC1", # 52
-    "O=C1CCC2(CCO1)OCCCCO2", # 53
-    "O=C1CCC2(CCO1)OCCCO2", # 54
-    "O=C1CCC2(CCO1)OCCO2", # 55
-    "O=C1CCCCCCCC/C=C/CCCCCO1", # 56
-    "O=C1CCCCCCCCCCCCCCO1", # 57
-    "O=C1CCCCCCCCCCCCO1", # 58
-    "O=C1CCCCCCCCCCO1", # 59
-    "O=C1CCCCCCCO1", # 60
-    "O=C1CCCCCCO1", # 61
-    "O=C1CCCCCN1", # 62
-    "O=C1CCCCCO1", # 63
-    "O=C1CCCCCS1", # 64
-    "O=C1CCCCN1", # 65
-    "O=C1CCCCO1", # 66
-    "O=C1CCCCS1", # 67
-    "O=C1CCCN1", # 68
-    "O=C1CCCO1", # 69
-    "O=C1CCO1", # 70
-    "O=C1CN(Cc2ccccc2)CCO1", # 71
-    "O=C1CN(c2ccccc2)CCO1", # 72
-    "O=C1COC(=O)CO1", # 73
-    "O=C1COCCO1", # 74
-    "O=C1COCCOCCOCCOCCO1", # 75
-    "O=C1COCCS1", # 76
-    "O=C1CSCCO1", # 77
-    "O=C1CSCCS1", # 78
-    "O=C1C[C@@H]2CCCC[C@H]2O1", # 79
-    "O=C1Cc2ccccc2CCO1", # 80
-    "O=C1NC2CCC1C2", # 81
-    "O=C1NC2CCCC1C2", # 82
-    "O=C1OC2CCC1CC2", # 83
-    "O=C1OCCCO1", # 84
-    "O=C1OC[C@@H]2CCCC[C@@H]12", # 85
-    "O=C1OC[C@H]2C[C@@H]3C=C[C@]12O3", # 86
-    "O=C1OC[C@H]2C[C@@H]3CC[C@]12O3", # 87
-    "O=C1O[C@H]2CC[C@@H]1CC2", # 88
-    "S=C1CCCCCO1", # 89
-    "S=C1O[C@H]2C=CCO[C@@H]2CS1", # 90
-    "S=C1O[C@H]2CCCO[C@@H]2CS1", #  91
+    "C=C1CCCOC1=O",
+    "C=C1CCOC1=O",
+    "CC(C)(C)C1CCOC(=O)CC1",
+    "CC(C)(C)OC(=O)N1CCOC(=O)C1",
+    "CC(C)(C)OC(=O)N1C[C@H]2C[C@@H]1C(=O)S2",
+    "CC(C)C1CCOC(=O)CC1",
+    "CC(C)[C@@H]1CC[C@@H](C)CC(=O)O1",
+    "CC1(C)CCOC(=O)CC1",
+    "CC1(C)COC(=O)OC1",
+    "CC1(C)COC1=O",
+    "CC1(C)COC2(CCOC(=O)CC2)OC1",
+    "CC1(C)SCCSC1=O",
+    "CC1(C)[C@H]2CCC(=O)O[C@@H]1C2",
+    "CC1(c2ccccc2)COC(=O)OC1",
+    "CC1=CCC(=O)O1",
+    "CC1CC(=O)O1",
+    "CC1CCC(=O)OC1",
+    "CC1CCCC(=O)O1",
+    "CC1CCCOC1=O",
+    "CC1CCCSC1=O",
+    "CC1CCOC(=O)C1",
+    "CC1CCOC(=O)CC1",
+    "CC1CCOC(=O)O1",
+    "CC1COC(=O)CC(C)C1",
+    "CC1COCC(=O)OCC(C)COCC(=O)OC1",
+    "CC1OC(=O)C(C)OC1=O",
+    "CC1OC(=O)C(C)SC1=O",
+    "CC1OC(=O)CCOC(=O)C(C)OC(=O)CCOC1=O",
+    "CC1OCCC(=O)O1",
+    "CC1OCCOC1=O",
+    "CC1SC(=O)C(C)SC1=O",
+    "CC1SCCSC1=O",
+    "CCC1(CC)COC(=O)OC1",
+    "CCC1(c2ccccc2)COC(=O)OC1",
+    "CCC1CCCC(=O)O1",
+    "CCC1CCCOC1=O",
+    "CCC1CCOC(=O)CC1",
+    "CCCC1CCCC(=O)O1",
+    "CCCC1CCCOC1=O",
+    "CCCCC1CCCC(=O)O1",
+    "CCCCC1CCCOC1=O",
+    "CCCCCC1CCCC(=O)O1",
+    "CCCCCC1CCCOC1=O",
+    "CCCCCCC1CCCC(=O)O1",
+    "CCCCCCC1CCCOC1=O",
+    "CCCCCCCC1CCCC(=O)O1",
+    "CCCCCCCCCC1CCCC(=O)O1",
+    "C[C@@H]1CC(=O)O[C@@H]2CCCC[C@H]2O1",
+    "C[C@@H]1CC(=O)O[C@H]2CCCC[C@@H]2O1",
+    "C[C@@H]1CC(=O)O[C@H]2CCC[C@@H]2O1",
+    "C[C@@H]1OC(=O)[C@H](C)OC1=O",
+    "C[C@@H]1OCCCOC(=O)[C@H](C)OCCCOC1=O",
+    "Cc1cn([C@H]2C[C@H]3OC(=O)OC[C@H]3O2)c(=O)n(C)c1=O",
+    "O=C1CCC2(CCO1)OCCCCO2",
+    "O=C1CCC2(CCO1)OCCCO2",
+    "O=C1CCC2(CCO1)OCCO2",
+    "O=C1CCCCCCCC/C=C/CCCCCO1",
+    "O=C1CCCCCCCCCCCCCCO1",
+    "O=C1CCCCCCCCCCCCO1",
+    "O=C1CCCCCCCCCCO1",
+    "O=C1CCCCCCCO1",
+    "O=C1CCCCCCO1",
+    "O=C1CCCCCN1",
+    "O=C1CCCCCO1",
+    "O=C1CCCCCS1",
+    "O=C1CCCCN1",
+    "O=C1CCCCO1",
+    "O=C1CCCCS1",
+    "O=C1CCCN1",
+    "O=C1CCCO1",
+    "O=C1CCO1",
+    "O=C1CN(Cc2ccccc2)CCO1",
+    "O=C1CN(c2ccccc2)CCO1",
+    "O=C1COC(=O)CO1",
+    "O=C1COCCO1",
+    "O=C1COCCOCCOCCOCCO1",
+    "O=C1COCCS1",
+    "O=C1CSCCO1",
+    "O=C1CSCCS1",
+    "O=C1C[C@@H]2CCCC[C@H]2O1",
+    "O=C1Cc2ccccc2CCO1",
+    "O=C1NC2CCC1C2",
+    "O=C1NC2CCCC1C2",
+    "O=C1OC2CCC1CC2",
+    "O=C1OCCCO1",
+    "O=C1OC[C@@H]2CCCC[C@@H]12",
+    "O=C1OC[C@H]2C[C@@H]3C=C[C@]12O3",
+    "O=C1OC[C@H]2C[C@@H]3CC[C@]12O3",
+    "O=C1O[C@H]2CC[C@@H]1CC2",
+    "S=C1CCCCCO1",
+    "S=C1O[C@H]2C=CCO[C@@H]2CS1",
+    "S=C1O[C@H]2CCCO[C@@H]2CS1",
 ]
 # RDKIT -------------
 

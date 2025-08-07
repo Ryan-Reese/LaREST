@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from rdkit.Chem.MolStandardize.rdMolStandardize import StandardizeSmiles
 
@@ -41,12 +40,13 @@ def get_experimental_data() -> None:
         usecols=[
             "monomer_smiles",
             "medium",
+            "solvent",
             "monomer_state",
             "polymer_state",
             "temperature",
             "delta_h",
             "delta_s",
-            "date",  # used to determine if entry is valid
+            "flag",  # used to determine if entry is valid
         ],
     )
     # remove calorimetry values for temperatures other than 298.15K
@@ -54,14 +54,15 @@ def get_experimental_data() -> None:
     df = df.drop(columns=["temperature"])
 
     # remove entries with missing data
-    df = df.dropna()
+    df = df.loc[df["flag"].isna()]
+    df = df.drop(columns=["flag"])
 
     # standardise monomer smiles strings
     df["monomer_smiles"] = df["monomer_smiles"].apply(
         lambda x: StandardizeSmiles(x),
     )
 
-    # used to compare with larest results
+    # extract only delta_h and delta_s for LaREST
     df_larest = (
         df.groupby(
             "monomer_smiles",
@@ -72,10 +73,14 @@ def get_experimental_data() -> None:
         .reset_index()
     )
     # df = df.sort_values("standardised_smiles")
-    df_larest.to_csv("./experimental.csv", index=False, header=True)
+    df_larest.sort_values(["monomer_smiles"]).to_csv(
+        "./experimental.csv",
+        index=False,
+        header=True,
+    )
 
     # contains secondary information for analysis
-    df.sort_values(["monomer_smiles", "date"]).to_csv(
+    df.sort_values(["monomer_smiles"]).to_csv(
         "./experimental_detailed.csv",
         index=False,
         header=True,

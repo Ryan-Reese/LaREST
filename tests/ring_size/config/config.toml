@@ -16,7 +16,7 @@ format = "%(asctime)s:%(name)s:%(levelname)s:%(message)s"
 class = "logging.FileHandler"
 level = "DEBUG"
 encoding = "utf-8"
-filename = "larest4.log"
+filename = "larest.log"
 formatter = "default"
 mode = "a"
 

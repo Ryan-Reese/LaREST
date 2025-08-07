@@ -5,7 +5,7 @@
 
 # Setting environment variables
 OUTPUT_DIR="tests/ring_size/output"
-CONFIG_DIR="tests/ring_size/config11"
+CONFIG_DIR="tests/ring_size/config"
 CONDA_DIR="${HOME}/miniforge3/bin"
 CONDA_ENV="larest-main"
 N_CORES=128

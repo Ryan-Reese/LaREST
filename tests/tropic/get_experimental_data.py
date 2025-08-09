@@ -39,6 +39,7 @@ def get_experimental_data() -> None:
         header=0,
         usecols=[
             "monomer_smiles",
+            "polymerisation_type",
             "medium",
             "solvent",
             "monomer_state",
@@ -46,6 +47,7 @@ def get_experimental_data() -> None:
             "temperature",
             "delta_h",
             "delta_s",
+            "doi",
             "flag",  # used to determine if entry is valid
         ],
     )
@@ -60,10 +62,11 @@ def get_experimental_data() -> None:
     # remove entries with missing delta_h or delta_s
     df = df.loc[df["delta_h"].notna() & df["delta_s"].notna()]
 
-    # standardise monomer smiles strings
+    # standardise and sort monomer smiles strings
     df["monomer_smiles"] = df["monomer_smiles"].apply(
         lambda x: StandardizeSmiles(x),
     )
+    df = df.sort_values(["monomer_smiles"])
 
     # extract only delta_h and delta_s for LaREST
     df_larest = (
@@ -76,14 +79,14 @@ def get_experimental_data() -> None:
         .reset_index()
     )
     # df = df.sort_values("standardised_smiles")
-    df_larest.sort_values(["monomer_smiles"]).to_csv(
+    df_larest.to_csv(
         "./experimental.csv",
         index=False,
         header=True,
     )
 
     # contains secondary information for analysis
-    df.sort_values(["monomer_smiles"]).to_csv(
+    df.to_csv(
         "./experimental_detailed.csv",
         index=False,
         header=True,

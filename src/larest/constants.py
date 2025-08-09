@@ -43,16 +43,16 @@ PIPELINE_SECTIONS: list[str] = [
     "3_REFINEMENT",
 ]
 ENTHALPY_PLOTTING_SECTIONS: list[str] = [
-    "rdkit_xtb",
-    "crest_xtb",
+    "rdkit",
+    "crest",
     # "0_PRESCREENING",
     "1_SCREENING",
     "2_OPTIMIZATION",
     "3_REFINEMENT",
 ]
 ENTROPY_PLOTTING_SECTIONS: list[str] = [
-    "rdkit_xtb",
-    "crest_xtb",
+    "rdkit",
+    "crest",
     "crest_corrected_xtb",
     "3_REFINEMENT",
     "censo_corrected",

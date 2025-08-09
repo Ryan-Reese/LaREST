@@ -45,20 +45,17 @@ type = "RER" # ["RER", "ROR"]
 # lengths = [1, 2, 3]
 lengths = [2, 3, 4] # lengths for RER
 initiator = "C1=CC=C(C=C1)C(=O)O" # str
-monomers = [
+monomers = [ # list[str]
     "O=C1OCC1", # 4
+    "O=C1OCCC1", # 5
+    "O=C1OCCCC1", # 6
+    "O=C1OCCCCC1", # 7
+    "O=C1OCCCCCC1", # 8
+    "O=C1OCCCCCCC1", # 9
+    "O=C1OCCCCCCCC1", # 10
+    "O=C1OCCCCCCCCC1", # 11
 ]
-# monomers = [ # list[str]
-#     "O=C1OCC1", # 4
-#     "O=C1OCCC1", # 5
-#     "O=C1OCCCC1", # 6
-#     "O=C1OCCCCC1", # 7
-#     "O=C1OCCCCCC1", # 8
-#     "O=C1OCCCCCCC1", # 9
-#     "O=C1OCCCCCCCC1", # 10
-#     "O=C1OCCCCCCCCC1", # 11
-# ]
-#
+
 # RDKIT -------------
 
 [rdkit]

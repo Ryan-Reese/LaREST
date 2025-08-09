@@ -1,0 +1,39 @@
+ring_size,delta_H,delta_S
+4,-74.8,-54.4 # 10.1016/0032-3950(79)90164-3
+4,-82.3,-74.0 # 10.1016/0032-3950(79)90164-3
+5,-5.4, -39.6 # 10.1038/nchem.2391
+6,-11.8,-29.6 # 10.1021/acs.macromol.4c01469
+6,-12.0,-24.0 # 10.1002/anie.202502436
+7,-14.0,-6.0 # 10.1002/1521-3935(20020401)203:5/6<889::AID-MACP889>3.0.CO;2-O
+7,-20.4,-12.8 # 10.1021/acs.macromol.4c01469
+7,-16.2,-13.0 # 10.1002/anie.202502436
+8,-37.0,-60.0 # 10.1070/RC1996v065n12ABEH000265
+8,-19.0,2.0 # 10.1070/RC1996v065n12ABEH000265
+9,-43.0,-61.0 # 10.1070/RC1996v065n12ABEH000265
+9,-21.0,7.0 # 10.1070/RC1996v065n12ABEH000265
+10,null,null
+11,null,null
+12,-28.0,24.0 # 10.1070/RC1996v065n12ABEH000265
+12,-62.0,-69.0 # 10.1070/RC1996v065n12ABEH000265
+13,null,null
+14,2.0,57.0 # 10.1070/RC1996v065n12ABEH000265
+14,-38.0,-50.0 # 10.1070/RC1996v065n12ABEH000265
+15,null,null
+16,-2.0,26.1 # 10.1021/acs.macromol.4c01469
+16,-4.6,18.0 # 10.1002/anie.202502436
+
+
+# References:
+# [4] averaged over different polymer states in bulk
+# [5] taken from ROP reaction in dcm_d2
+# [6] averaged over ROP reactions in toluene solvent
+# [7] averaged over ROP reactions in toluene solvent/co-solvent
+# [8] averaged over different polymer states in bulk
+# [9] averaged over different polymer states in bulk
+# [10]
+# [11]
+# [12] averaged over different polymer states in bulk
+# [13]
+# [14] averaged over different polymer states in bulk
+# [15]
+# [16] averaged over ROP reactions in toluene solvent

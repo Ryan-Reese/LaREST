@@ -725,7 +725,6 @@ class Polymer(LarestMol):
 
 
 class Monomer(LarestMol):
-    _ring_size: int | None
     _initiator: Initiator
     _polymers: list[Polymer]
 

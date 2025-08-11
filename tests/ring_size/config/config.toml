@@ -41,10 +41,10 @@ xtb = true
 # REACTION -------------
 
 [reaction]
-type = "RER" # ["RER", "ROR"]
+type = "ROR" # ["RER", "ROR"]
 # lengths = [1, 2, 3]
 lengths = [2, 3, 4] # lengths for RER
-initiator = "C1=CC=C(C=C1)C(=O)O" # str
+initiator = "C1=CC=C(C=C1)CO" # str
 monomers = [ # list[str]
     "O=C1OCC1", # 4
     "O=C1OCCC1", # 5

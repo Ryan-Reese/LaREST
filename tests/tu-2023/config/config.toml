@@ -44,7 +44,7 @@ xtb = true
 type = "RER" # ["RER", "ROR"]
 # lengths = [1, 2, 3]
 lengths = [2, 3, 4] # lengths for RER
-initiator = "C1=CC=C(C=C1)C(=O)O" # str
+initiator = "C1=CC=C(C=C1)CO" # str
 monomers = [ # list[str]
     "O=C1OCCCCC1", # CL
     "O=C1OCCC(C)CC1", # M1

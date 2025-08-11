@@ -3,7 +3,14 @@ from typing import Any, Literal
 
 from rdkit.Chem.rdchem import Atom, BondType, EditableMol, Mol, RingInfo
 from rdkit.Chem.rdmolfiles import MolFromSmarts, MolFromSmiles, MolToSmiles
-from rdkit.Chem.rdmolops import MolzipLabel, MolzipParams, molzip
+from rdkit.Chem.rdmolops import (
+    AddHs,
+    MolzipLabel,
+    MolzipParams,
+    RemoveHs,
+    RemoveHsParameters,
+    molzip,
+)
 
 from larest.constants import INITIATOR_GROUPS, MONOMER_GROUPS
 from larest.exceptions import PolymerBuildError
@@ -68,7 +75,16 @@ def get_polymer_unit(
     # convert monomer/initiator smiles and front/back dummies to RDKit Mol/Atoms
     logger.debug(f"Getting {mol_type} unit for polymer construction (SMILES: {smiles})")
     logger.debug(f"Front dummy: {front_dummy}, Back dummy {back_dummy}")
-    mol: Mol = MolFromSmiles(smiles)
+    # creating the RDKit mol object
+    match mol_type:
+        case "monomer":
+            mol: Mol = MolFromSmiles(smiles)
+        case "initiator":
+            # need to add Hs to break O-H bond
+            mol: Mol = AddHs(
+                mol=MolFromSmiles(smiles),
+                explicitOnly=False,
+            )
     front_dummy_atom: Atom = MolFromSmiles(f"[{front_dummy}]").GetAtomWithIdx(0)
     back_dummy_atom: Atom = MolFromSmiles(f"[{back_dummy}]").GetAtomWithIdx(0)
 
@@ -94,7 +110,7 @@ def get_polymer_unit(
                         ):
                             fg_atom_idx.append(atom_id)
                     case "initiator":
-                        # break C-OH bond
+                        # break O-H bond
                         fg_atom_idx.append(atom_id)
                 if len(fg_atom_idx) == 2:
                     break
@@ -211,8 +227,8 @@ def build_polymer(
                 terminal_unit = get_polymer_unit(
                     smiles=config["reaction"]["initiator"],
                     mol_type="initiator",
-                    front_dummy=front_dummy,
-                    back_dummy="Xe",
+                    front_dummy="Xe",
+                    back_dummy=front_dummy,
                     logger=logger,
                 )
             case "RER":
@@ -231,7 +247,16 @@ def build_polymer(
 
     mol_zip_params.setAtomSymbols([front_dummy, "Xe"])
     try:
-        polymer = molzip(polymer, terminal_unit, mol_zip_params)
+        match reaction_type:
+            case "ROR":
+                # Need to remove Hs following initiator addition
+                polymer = RemoveHs(
+                    mol=molzip(polymer, terminal_unit, mol_zip_params),
+                    implicitOnly=False,
+                    sanitize=True,
+                )
+            case "RER":
+                polymer = molzip(polymer, terminal_unit, mol_zip_params)
     except Exception as err:
         logger.exception(err)
         logger.exception(

@@ -16,7 +16,7 @@ MONOMER_GROUPS: dict[str, str] = {
     "Lm": "[C,c;R]-[C;R](=[O;!R])-[N;R]",
 }
 # TODO: include additional initiator groups for further customisation
-INITIATOR_GROUPS: dict[str, str] = {"OH": "C[OH]"}
+INITIATOR_GROUPS: dict[str, str] = {"R-OH": "[O;H][H]"}
 CREST_ENTROPY_OUTPUT_PARAMS: list[str] = [
     "S_conf",
     "S_rrho",

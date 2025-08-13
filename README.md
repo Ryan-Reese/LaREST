@@ -18,20 +18,51 @@ git clone https://github.com/grimme-lab/CENSO.git
 pip install .
 ```
 
-3. **ORCA**: `LaREST` (indirectly through `CENSO`) requires an `ORCA` installation to be available within the system's `PATH`.
+> [!NOTE]
+> The method of installation is actually unimportant, as long as the `CENSO` binary can be found in the system path.
 
-The current release of `LaREST` has been tested with the larest release of `ORCA` (6.1.0).
+3. **ORCA**: `LaREST` (indirectly through `CENSO`) requires an `ORCA` installation to be available within the system's `PATH`.
 
 > [!IMPORTANT]
 > For different versions of `ORCA`, please remember to change the `orcaversion` [config](./config/config.toml) variable accordingly.
 
+4. **LaREST**: Lastly, we install `LaREST` as a package in our `Conda` environment.
+
+```bash
+git clone https://github.com/Ryan-Reese/LaREST.git
+pip install .
+```
 
 ## Usage
 
 `LaREST` has been written so that the entire computational pipeline can be customised within its [config](./config/config.toml) file.
 
-For explanations/documentation for settings within `xTB`, `CREST`, or `CENSO`, please consult their doc pages. 
+### For Imperial HPC Users
 
+For users of `LaREST` via Imperial College's HPC service, an included [pipeline script](./pipeline.sh) has been included.
+
+Settings affecting job sizes can be changed by altering the first few lines of the job script.
+
+Following the PBS directives, you will need to modify the environment variables found in the `MODIFY ME` block:
+- `CONDA_DIR`: **Please change this variable to the location of your `Conda` binary**
+- `CONDA_ENV`: If the `Conda` environment was created using the [included file](./environment.yaml), you can leave this as `"larest"`
+- `N_CORES`: The number of cores/MPI processes specified in the job script (`128` by default corresponds to a 'large' job)
+
+`LaREST` can then be run by navigating to the **parent `LaREST` directory** and submitting the job script using `qsub`. For instance,
+
+```bash
+cd LaREST.git
+qsub pipeline.sh
+```
+
+## Dependencies
+
+The current version of LaREST has been tested with the following dependency versions:
+
+`xTB` | 6.7.1 
+`CREST` | 3.0.2 
+`CENSO` | 2.1.4
+`ORCA` | 6.1.0
 
 ## Citations
 

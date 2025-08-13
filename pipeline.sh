@@ -3,12 +3,15 @@
 #PBS -l walltime=23:59:00
 #PBS -l select=1:ncpus=128:mem=512gb:mpiprocs=128
 
-# Setting environment variables
-OUTPUT_DIR="output"
-CONFIG_DIR="config" # contains config.toml
+# MODIFY ME
+# ---------
 CONDA_DIR="${HOME}/miniforge3/bin"
 CONDA_ENV="larest"
 N_CORES=128
+# ---------
+
+OUTPUT_DIR="output"
+CONFIG_DIR="config"
 
 # xtb-required options
 ulimit -s unlimited

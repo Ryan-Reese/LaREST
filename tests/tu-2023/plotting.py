@@ -572,15 +572,3 @@ if __name__ == "__main__":
         config=config,
         output_dir=Path("./assets"),
     )
-
-    # plot_enthalpy(
-    #     args=args,
-    #     config=config,
-    #     output_dir=Path("./assets", "extrapolation"),
-    # )
-
-    # plot_entropy(
-    #     args=args,
-    #     config=config,
-    #     output_dir=Path("./assets", "extrapolation"),
-    # )

@@ -296,7 +296,7 @@ def extract_best_conformer_xyz(
                 if best_conformer_id in line.split():
                     try:
                         with open(output_xyz_file, "w") as fout:
-                            fout.writelines(conformers_xyz[i - 1 : i + n_atoms + 2])
+                            fout.writelines(conformers_xyz[i - 1 : i + n_atoms + 1])
                     except Exception as err:
                         logger.exception(err)
                         logger.exception(

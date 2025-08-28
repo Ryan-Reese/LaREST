@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from larest.base import Monomer
 from larest.parsers import LarestArgumentParser
-from larest.setup import get_config, setup_logger
+from larest.setup import get_config, get_logger
 
 
 def main(
@@ -66,6 +66,7 @@ def main(
 
 
 def entry_point() -> None:
+    """Entry point of the LaREST package script"""
     # parse input arguments to get output and config dirs
     parser: LarestArgumentParser = LarestArgumentParser()
     args: Namespace = parser.parse_args()
@@ -78,7 +79,7 @@ def entry_point() -> None:
 
     # setup logger using config
     try:
-        logger: Logger = setup_logger(
+        logger: Logger = get_logger(
             name=__name__,
             args=args,
             config=config,

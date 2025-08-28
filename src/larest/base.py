@@ -113,6 +113,8 @@ class LarestMol(metaclass=ABCMeta):
     def run(self) -> None:
         """Run the LaREST pipeline for the molecule"""
         try:
+            self._setup_pipeline()
+
             if self._config["steps"]["rdkit"] and (
                 self._pipeline_stage <= PipelineStage.RDKIT
             ):
@@ -236,7 +238,7 @@ class LarestMol(metaclass=ABCMeta):
         self._logger.debug("Computing thermodynamic parameters of conformers using xTB")
 
         xtb_default_args: list[str] = parse_command_args(
-            sub_config=["xtb", "rdkit"],
+            sub_config=["xtb"],
             config=self._config,
             logger=self._logger,
         )
@@ -417,7 +419,7 @@ class LarestMol(metaclass=ABCMeta):
             xtb_results: dict[str, float | None] = self._run_xtb(
                 xtb_input_file=best_crest_conformer_xyz_file,
                 xtb_dir=xtb_dir,
-                xtb_sub_config=["xtb", "crest"],
+                xtb_sub_config=["xtb"],
             )
 
             # add to self.results
@@ -429,7 +431,7 @@ class LarestMol(metaclass=ABCMeta):
         """
 
         # create .censo2rc for run
-        create_censorc(args=self._args, logger=self._logger)
+        create_censorc(config=self._config, logger=self._logger)
 
         censo_dir: Path = Path(self.dir_path, "censo")
         create_dir(censo_dir, self._logger)
@@ -666,6 +668,12 @@ class LarestMol(metaclass=ABCMeta):
                 indent=4,
                 allow_nan=True,
             )
+
+    def _setup_pipeline(self) -> None:
+        # Create temp dirs
+        temp_config_dir: Path = Path(self._args.config, "temp")
+        create_dir(temp_config_dir, self._logger)
+        self._config["temp_config_dir"] = temp_config_dir
 
     def _cleanup_pipeline(self) -> None:
         # Remove temp dirs

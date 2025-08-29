@@ -1,14 +1,6 @@
 larest package
 ==============
 
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   larest.helpers
-
 Submodules
 ----------
 

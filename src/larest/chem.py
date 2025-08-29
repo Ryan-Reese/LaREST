@@ -17,7 +17,21 @@ from larest.exceptions import PolymerBuildError
 
 
 def get_mol(smiles: str, logger: Logger) -> Mol:
-    """Get an rdkit molecule object from a SMILES string."""
+    """Get an RDKit Mol object from a SMILES string
+
+    Parameters
+    ----------
+    smiles : str
+        Input SMILES string of the molecule
+    logger : Logger
+        Logger for LaREST run
+
+    Returns
+    -------
+    Mol
+        RDKit Mol object with the specified SMILES string
+
+    """
     mol: Mol = MolFromSmiles(smiles)
     if mol is None:
         raise PolymerBuildError(
@@ -28,7 +42,21 @@ def get_mol(smiles: str, logger: Logger) -> Mol:
 
 
 def get_ring_size(smiles: str, logger: Logger) -> int | None:
-    """Get the size of the functional group ring in the monomer."""
+    """Get the ring size of the monomer with the specified SMILES
+
+    Parameters
+    ----------
+    smiles : str
+        Input SMILES string of the molecule
+    logger : Logger
+        Logger for LaREST run
+
+    Returns
+    -------
+    int | None
+        Funtional group ring size of the monomer, or None is ring size cannot be determined
+
+    """
     try:
         mol: Mol = get_mol(smiles, logger)
     except PolymerBuildError:
@@ -59,6 +87,27 @@ def get_polymer_unit(
     back_dummy: str,
     logger: Logger,
 ) -> Mol:
+    """Get singular polymer build unit, constructed from the monomer/initiator
+
+    Parameters
+    ----------
+    smiles : str
+        Input SMILES string of the monomer/initiator
+    mol_type : Literal["monomer", "initiator"]
+        Whether the build unit is from the monomer or initiator
+    front_dummy : str
+        Front dummy atom used to attach to the polymer chain
+    back_dummy : str
+        Back dummy atom used to attach to the polymer chain
+    logger : Logger
+        Logger for the LaREST run
+
+    Returns
+    -------
+    Mol
+        RDKIT Mol object for the polymer build unit
+
+    """
     # NOTE: output for molecules with >1 ring-opening functional group
     # is deterministic but not yet customisable
 

@@ -22,8 +22,9 @@ export OMP_MAX_ACTIVE_LEVELS=1
 export OPENBLAS_NUM_THREADS=1
 export XTBPATH="$(pwd)"
 
-# load orca
+# load orca and censo
 module load ORCA/6.1.0-gompi-2023b
+module load CENSO/2.1.4-gfbf-2023b
 
 # activate conda env
 eval "$("${CONDA_DIR}"/conda shell.bash hook)"

@@ -322,7 +322,7 @@ class LarestMol(metaclass=ABCMeta):
             try:
                 xtb_output = parse_xtb_output(
                     xtb_output_file=xtb_output_file,
-                    temperature=self._config["xtb"]["rdkit"]["etemp"],
+                    temperature=self._config["xtb"]["etemp"],
                     logger=self._logger,
                 )
             except Exception:
@@ -419,7 +419,6 @@ class LarestMol(metaclass=ABCMeta):
             xtb_results: dict[str, float | None] = self._run_xtb(
                 xtb_input_file=best_crest_conformer_xyz_file,
                 xtb_dir=xtb_dir,
-                xtb_sub_config=["xtb"],
             )
 
             # add to self.results
@@ -505,7 +504,6 @@ class LarestMol(metaclass=ABCMeta):
         self,
         xtb_input_file: Path,
         xtb_dir: Path,
-        xtb_sub_config: list[str],
     ) -> dict[str, float | None]:
         # Running xTB within intermediate pipeline sections
         xtb_args: list[str] = [
@@ -515,7 +513,7 @@ class LarestMol(metaclass=ABCMeta):
             xtb_input_file.name.split(".")[0],
         ]
         xtb_args += parse_command_args(
-            sub_config=xtb_sub_config,
+            sub_config=["xtb"],
             config=self._config,
             logger=self._logger,
         )
@@ -539,7 +537,7 @@ class LarestMol(metaclass=ABCMeta):
         try:
             xtb_results: dict[str, float | None] = parse_xtb_output(
                 xtb_output_file=xtb_output_file,
-                temperature=self._config["xtb"][xtb_sub_config[1]]["etemp"],
+                temperature=self._config["xtb"]["etemp"],
                 logger=self._logger,
             )
         except Exception:

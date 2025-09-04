@@ -22,7 +22,7 @@ rdkit = true
 crest_confgen = true
 censo = true
 crest_entropy = true
-xtb = true # need to remove
+xtb = true # used to rank rdkit and crest_confgen
 
 # RDKIT -------------
 

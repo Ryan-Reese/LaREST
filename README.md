@@ -12,7 +12,7 @@ conda activate larest
 pip install . # to install LaREST itself
 ```
 
-Users of Imperial College's HPC service can skip to [Usage](#usage)
+Users of Imperial College's HPC service can skip to [usage](#usage)
 
 2. **CENSO**: `CENSO` will have to be separately installed following the instructions on their [repository](https://github.com/grimme-lab/CENSO).
 

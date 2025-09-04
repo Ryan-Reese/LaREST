@@ -2,22 +2,19 @@
 
 ## Installation
 
-1. **Conda**: The majority of the required packages for `LaREST` can be installed through the included [environment](./environment.yaml) file using `Conda`. Installing through this method automatically creates the `larest` conda environment.
+1. **Conda**: The majority of the required packages for `LaREST` (including `LaREST` itself) can be installed through the included [environment](./environment.yaml) file using `Conda`. Installing through this method automatically creates the `larest` environment.
 
 ```bash
+git clone https://github.com/Ryan-Reese/LaREST.git
+cd LaREST
 conda env create -f environment.yaml
 conda activate larest
+pip install . # to install LaREST itself
 ```
 
-2. **CENSO**: `CENSO` will have to be seperately installed following the instructions on their [repository](https://github.com/grimme-lab/CENSO).
+Users of Imperial College's HPC service can skip to [Usage](#usage)
 
-This can typically be done through cloning the `CENSO` repository and locally installing the package into our `Conda` environment.
-For example,
-
-```bash
-git clone https://github.com/grimme-lab/CENSO.git
-pip install .
-```
+2. **CENSO**: `CENSO` will have to be separately installed following the instructions on their [repository](https://github.com/grimme-lab/CENSO).
 
 > [!NOTE]
 > The method of installation is actually unimportant, as long as the `CENSO` binary can be found in the system path.
@@ -27,20 +24,13 @@ pip install .
 > [!IMPORTANT]
 > For different versions of `ORCA`, please remember to change the `orcaversion` [config](./config/config.toml) variable accordingly.
 
-4. **LaREST**: Lastly, we install `LaREST` as a package in our `Conda` environment.
-
-```bash
-git clone https://github.com/Ryan-Reese/LaREST.git
-pip install .
-```
-
 ## Usage
 
 `LaREST` has been written so that the entire computational pipeline can be customised within its [config](./config/config.toml) file.
 
 ### For Imperial HPC Users
 
-For users of `LaREST` via Imperial College's HPC service, a dedicated [pipeline script](./pipeline.sh) has been included.
+For users of `LaREST` via Imperial College's HPC service, a dedicated [pipeline script](./pipeline.sh) has been included. `CENSO` and `ORCA` are made available using `module` and are activated using this script, so separate installation is unnecessary.
 
 Settings affecting job sizes can be changed by altering the first few lines of the job script.
 
@@ -59,7 +49,7 @@ Following the PBS directives, you will need to modify the following environment 
 For instance,
 
 ```bash
-cd LaREST.git
+cd LaREST
 qsub pipeline.sh
 ```
 

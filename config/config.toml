@@ -7,12 +7,10 @@
 
 [reaction]
 type = "RER" # ["RER", "ROR"]
-lengths = [2, 3, 4] # list[int]
+lengths = [2] # list[int]
 initiator = "C1=CC=C(C=C1)CO" # str
 monomers = [ # list[str]
     "O=C1OCC1",
-    "O=C1OCCC1",
-    "O=C1OCCCC1",
 ]
 
 # STEPS -------------

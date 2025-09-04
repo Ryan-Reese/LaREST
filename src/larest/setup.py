@@ -23,7 +23,7 @@ def get_config(args: argparse.Namespace) -> dict[str, Any]:
 
     """
     config_file: Path = Path(args.config) / "config.toml"
-    defaults_file: Path = Path(args.config) / "default.toml"
+    defaults_file: Path = Path(args.config) / "defaults.toml"
     try:
         # load config and defaults
         with open(config_file, "rb") as fstream:

@@ -129,7 +129,3 @@ dependencies:
   - xorg-libxrender=0.9.12=hb9d3cd8_0
   - xtb=6.7.1=hd37a5e2_3
   - zstd=1.5.7=hb8e6e7a_2
-  - pip:
-      - censo==2.1.4
-      - larest==0.0.0
-prefix: /home/rmrr/.conda/envs/larest

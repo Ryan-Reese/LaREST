@@ -2,7 +2,7 @@
 
 ## Installation
 
-1. **Conda**: The majority of the required packages for `LaREST` can be installed through the included [environment](./environment.yaml) file using `Conda`.
+1. **Conda**: The majority of the required packages for `LaREST` can be installed through the included [environment](./environment.yaml) file using `Conda`. Installing through this method automatically creates the `larest` conda environment.
 
 ```bash
 conda env create -f environment.yaml
@@ -40,7 +40,7 @@ pip install .
 
 ### For Imperial HPC Users
 
-For users of `LaREST` via Imperial College's HPC service, an dedicates [pipeline script](./pipeline.sh) has been included.
+For users of `LaREST` via Imperial College's HPC service, a dedicated [pipeline script](./pipeline.sh) has been included.
 
 Settings affecting job sizes can be changed by altering the first few lines of the job script.
 

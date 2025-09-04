@@ -12,12 +12,16 @@ conda activate larest
 pip install . # to install LaREST itself
 ```
 
+
+2. **CENSO**: `CENSO` will have to be separately installed following the instructions on their [repository](https://github.com/grimme-lab/CENSO). For instance,
+
+```bash
+git clone https://github.com/grimme-lab/CENSO.git
+cd CENSO
+pip install . # to install CENSO
+```
+
 Users of Imperial College's HPC service can skip to [usage](#usage)
-
-2. **CENSO**: `CENSO` will have to be separately installed following the instructions on their [repository](https://github.com/grimme-lab/CENSO).
-
-> [!NOTE]
-> The method of installation is actually unimportant, as long as the `CENSO` binary can be found in the system path.
 
 3. **ORCA**: `LaREST` (indirectly through `CENSO`) requires an `ORCA` installation to be available within the system's `PATH`.
 
